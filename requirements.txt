@@ -6,4 +6,5 @@ tqdm~=4.66
 numba~=0.58
 dask~=2023.10
 scipy~=1.11
+gym~=0.26.2
 Cython
