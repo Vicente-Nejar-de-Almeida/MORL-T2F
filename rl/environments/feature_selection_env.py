@@ -6,7 +6,7 @@ from jqmcvi.base import dunn_fast
 
 
 def normalized_DBS(df_feat_all, y_pred):
-    upper_limit = 100
+    upper_limit = 1000
     dbs = davies_bouldin_score(df_feat_all, y_pred)
     if dbs > upper_limit:
         dbs = upper_limit
@@ -26,7 +26,7 @@ def normalized_CHS(df_feat_all, y_pred):
 
 
 def normalized_DuS(df_feat_all, y_pred):
-    upper_limit = 1
+    upper_limit = 1000
     dus = dunn_fast(df_feat_all, y_pred)
     if dus > upper_limit:
         dus = upper_limit
@@ -99,7 +99,6 @@ class FeatureSelectionEnvironment(gym.Env):
     def _get_reward(self, action):
         selected_features = [feature for i, feature in enumerate(self.all_features.columns) if self.current_state[i]]
         y_pred = self.clustering_model.fit_predict(self.all_features[selected_features])
-        
         try:
             """
             Test to see if this works well, otherwise we have two current options:
@@ -127,20 +126,20 @@ class FeatureSelectionEnvironment(gym.Env):
 
         self.score_history.append(detailed_scores)
         
-        return gain
+        return gain, y_pred
     
     def step(self, action):
         self.current_state[action] = 1
-        reward = self._get_reward(action)
+        reward, features = self._get_reward(action)
         observation = self._get_obs()
         info = self._get_info()
-        
+        # Questo non va bene perché si deve fermare quando le performance sono stabili.
         if len(self.current_state[self.current_state == 1]) < self.n_features:
             terminated = False
         else:
             terminated = True
 
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, False, info, features
     
     def render(self):
         pass

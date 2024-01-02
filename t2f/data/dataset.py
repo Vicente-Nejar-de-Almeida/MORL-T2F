@@ -1,7 +1,7 @@
 from typing import List, Tuple
 import os
 import numpy as np
-
+from aeon.datasets import load_classification
 # import pandas as pd
 
 from .reader import load_from_tsfile_to_dataframe
@@ -17,7 +17,7 @@ def read_ucr_mts(path: str) -> Tuple[List[np.ndarray], list]:
     df, y = load_from_tsfile_to_dataframe(path)
 
     # Extract list of mts array
-    df = df.map(lambda val: val.to_list())
+    df = df.apply(lambda val: val.to_list())
     ts_list = df.apply(lambda row: np.array(row.to_list()).T, axis=1).to_list()
 
     # Check mts consistency
@@ -27,22 +27,11 @@ def read_ucr_mts(path: str) -> Tuple[List[np.ndarray], list]:
     return ts_list, list(y)
 
 
-def read_ucr_datasets(paths: List[str]) -> Tuple[np.ndarray, np.ndarray]:
-    """ Read ucr datasets """
-    # Read list of ucr multivariate time-series
-    ts_list = []
-    y_list = []
-    for path in paths:
-        ts, y = read_ucr_mts(path)
-        ts_list += ts
-        y_list += y
-
-    ts_list = np.array(ts_list)
-    y = np.array(y_list)
-
-    # Transform y array into numeric form
-    # y = pd.get_dummies(y).sort_index(axis=1).apply(np.argmax, axis=1).values.astype('int')
-
+def read_ucr_datasets(nameDataset: str) -> Tuple[np.ndarray, np.ndarray]:
+    """ Read ucr datasets
+    """
+    ts_list, y = load_classification(nameDataset)
+    ts_list = np.transpose(ts_list, (0, 2, 1))
     return ts_list, y
 
 
