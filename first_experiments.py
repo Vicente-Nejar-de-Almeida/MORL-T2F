@@ -19,7 +19,7 @@ from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    listNameDataset = ["Handwriting"]
+    listNameDataset = ["RacketSports"]
     transform_type = 'minmax'
     model_type = 'Hierarchical'
     train_size = 0.3
@@ -49,21 +49,18 @@ if __name__ == '__main__':
 
         if not os.path.isfile("data//"+nameDataset+"_feats.pkl"):
             df_all_feats = feature_extraction(ts_list, batch_size, p)
-            df_all_feats = cleaning(df_all_feats)
-
             file = open("data//"+nameDataset+"_feats.pkl", 'wb')
             pickle.dump(df_all_feats, file)
 
         with open("data//"+nameDataset+"_feats.pkl", 'rb') as pickle_file:
             df_all_feats = pickle.load(pickle_file)
 
-
-
+        df_all_feats = cleaning(df_all_feats)
         total_number_of_features = len(df_all_feats.columns)
         print('Total number of features:', total_number_of_features)
 
-        episodes = 10
-        n_features = round(total_number_of_features * 0.1)
+        episodes = 100
+        n_features = round(total_number_of_features * 0.15)
         # n_features = 130
         env = FeatureSelectionEnvironment(
             df_features=df_all_feats,

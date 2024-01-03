@@ -12,13 +12,14 @@ def cleaning(df: pd.DataFrame) -> pd.DataFrame:
     df = df.dropna(axis=1, how='any')
     cond = ((df == float('inf')) | (df == float('-inf'))).any(axis=0)
     df = df.drop(df.columns[cond], axis=1)
-
     # Apply a simple variance threshold
     selector = VarianceThreshold()
     selector.fit(df)
     # Get only no-constant features
     top_features = selector.get_feature_names_out()
     df = df[top_features]
+    featRemoved = pfa_scoring(df, 0.9)
+    df = df[featRemoved[0]]
     return df
 
 
