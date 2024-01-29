@@ -80,7 +80,7 @@ if __name__ == '__main__':
         df_all_feats = cleaning(df_all_feats)
         print(len(df_all_feats))
         total_number_of_features = [50]
-        episodes_total = [200]
+        episodes_total = [100]
 
 
         for episodes in episodes_total:

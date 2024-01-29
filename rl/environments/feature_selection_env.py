@@ -5,75 +5,9 @@ import numpy as np
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from jqmcvi.base import dunn_fast
 from early_stopping_class import CustomEarlyStopping
-from OnlineDeviationMean import OnlineDeviationMean
-
-def normalized_DBS(df_feat_all, y_pred):
-    upper_limit = 100
-    dbs = davies_bouldin_score(df_feat_all, y_pred)
-
-    if dbs > upper_limit:
-        dbs = upper_limit
-    score = ((dbs - upper_limit)/(0-upper_limit))
-    # print('DBS:', str(dbs), '| Normalized:', str(score))
-    return -dbs, score
-
-
-def normalized_CHS(df_feat_all, y_pred):
-    upper_limit = 100
-    chs = calinski_harabasz_score(df_feat_all, y_pred)
-    if chs > upper_limit:
-        chs = upper_limit
-    score = chs/upper_limit
-    # print('CHS:', str(chs), '| Normalized:', str(score))
-    return chs, score
-
-
-def normalized_DuS(df_feat_all, y_pred):
-    upper_limit = 100
-    dus = dunn_fast(df_feat_all, y_pred)
-    if dus > upper_limit:
-        dus = upper_limit
-    score = dus/upper_limit
-    # print('DuS:', str(dus), '| Normalized:', str(score))
-    return dus, score
-
-
-def normalized_SilS(df_feat_all, y_pred): 
-    sils = silhouette_score(df_feat_all, y_pred)
-    score = (sils + 1)/(2)
-    # print('SilS:', str(sils), '| Normalized:', str(score))
-    return sils, score
 
 
 def obtain_score(df_feat_all, y_pred, list_eval):
-
-    '''
-    dbs, scoreDBS = normalized_DBS(df_feat_all, y_pred)
-    chs, scoreCHS = normalized_CHS(df_feat_all, y_pred)
-    dus, scoreDuS = normalized_DuS(df_feat_all, y_pred)
-    sils, scoreSilS = normalized_SilS(df_feat_all, y_pred)
-
-
-    scoreTotal = []
-    for i in range(len(list_eval)):
-        if i == 0:
-            scoreTotal.append(list_eval[i].compute_normalize(dbs))
-        elif i == 1:
-            scoreTotal.append(list_eval[i].compute_normalize(chs))
-        elif i == 2:
-            scoreTotal.append(list_eval[i].compute_normalize(dus))
-        elif i == 3:
-            scoreTotal.append(list_eval[i].compute_normalize(sils))
-    for i in range(len(list_eval)):
-        if i == 0:
-            list_eval[0].add_data_point(dbs)
-        elif i == 1:
-            list_eval[1].add_data_point(chs)
-        elif i == 2:
-            list_eval[2].add_data_point(dus)
-        elif i == 3:
-            list_eval[3].add_data_point(sils)
-    '''
 
     scoreTotal = []
     for norm_score in list_eval:
@@ -163,14 +97,6 @@ class FeatureSelectionEnvironment(gym.Env):
         else:
             terminated = False
 
-
-        '''
-        # Questo non va bene perché si deve fermare quando le performance sono stabili.
-        if len(self.current_state[self.current_state == 1]) < self.n_features:
-            terminated = False
-        else:
-            terminated = True
-        '''
         return observation, reward, terminated, False, info, features_selected
     
     def render(self):

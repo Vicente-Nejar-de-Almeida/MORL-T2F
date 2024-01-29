@@ -12,6 +12,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import adjusted_mutual_info_score
 import os
 
+from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
+from jqmcvi.base import dunn_fast
+import NormalizedScore as ns
+
+
 from rl.environments.multi_objective_feature_selection_env import MultiObjectiveFeatureSelectionEnvironment
 from rl.agents.ql_agent import QLAgent
 
@@ -19,13 +24,16 @@ from morl_baselines.multi_policy.envelope.envelope import Envelope
 
 
 if __name__ == '__main__':
-    listNameDataset = ["RacketSports"]
+    listNameDataset = ["BasicMotions"]
     transform_type = 'minmax'
     model_type = 'Hierarchical'
     train_size = 0.3
     batch_size = 500
     p = 8
 
+    silhouette_norm = ns.NormalizedScore(silhouette_score)
+    calinski_norm = ns.NormalizedScore(calinski_harabasz_score)
+    norm_list = [silhouette_norm, calinski_norm]
     for nameDataset in listNameDataset:
         # Read original dataset
         # print('Read ucr datasets: ', files)
@@ -59,13 +67,14 @@ if __name__ == '__main__':
         total_number_of_features = len(df_all_feats.columns)
         print('Total number of features:', total_number_of_features)
 
-        episodes = 100
+        episodes = 800
         n_features = round(total_number_of_features * 0.15)
         # n_features = 130
         env = MultiObjectiveFeatureSelectionEnvironment(
             df_features=df_all_feats,
             n_features=n_features,
             clustering_model=model,
+            list_eval=norm_list
         )
 
         results = {e: {
@@ -107,8 +116,8 @@ if __name__ == '__main__':
         )
 
         agent.train(
-            total_timesteps=200,
-            total_episodes=None,
+            total_timesteps=4000,
+            total_episodes=episodes,
             weight=None,
             eval_env=env,
             ref_point=np.array([0, 0, 0, -200.0]),
@@ -124,7 +133,7 @@ if __name__ == '__main__':
         obs, info = env.reset()
         done = False
         while not done:
-            action = agent.act(obs, w=np.array([1/4, 1/4, 1/4, 1/4]))
+            action = agent.act(obs, w=np.array(1/len(norm_list) for x in range(len(norm_list))))
             print(f'Action: {action}')
             next_obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
