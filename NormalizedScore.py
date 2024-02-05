@@ -1,5 +1,6 @@
 import math
 
+
 class NormalizedScore:
     def __init__(self, score_function):
         self.score_function = score_function
@@ -29,4 +30,3 @@ class NormalizedScore:
             return 0  # To avoid division by zero
         variance = (self.sum_of_squares - (self.sum ** 2) / self.count) / self.count
         return math.sqrt(variance)
-

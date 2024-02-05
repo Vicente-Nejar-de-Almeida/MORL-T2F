@@ -1,0 +1,3 @@
+IMPROVE = -1
+SAFE = 0
+STOP = 1

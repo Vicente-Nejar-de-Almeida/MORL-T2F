@@ -36,9 +36,9 @@ if __name__ == '__main__':
     batch_size = 500
     p = os.cpu_count()
     f = open('resultsT2RL.csv', 'w+', newline='')
-    writer = csv.writer(f)
+    # writer = csv.writer(f)
     header = ["Dataset", "n_feats", "AMI", "Time"]
-    writer.writerow(header)
+    # writer.writerow(header)
 
     silhouette_norm = ns.NormalizedScore(silhouette_score)
     calinski_norm = ns.NormalizedScore(calinski_harabasz_score)
@@ -144,7 +144,7 @@ if __name__ == '__main__':
                 AMI = adjusted_mutual_info_score(y_pred, y_true)
                 finTime = (time.time() - startTime) + extractTime
                 results = [nameDataset, n_features, AMI, finTime]
-                writer.writerow(results)
+                # writer.writerow(results)
                 print(f"{nameDataset}, has obtained a value of AMI equal to {AMI} with {len(env.best_conf_feat)} features with time {finTime}")
                 # print("The Dataset %s has obtained ")
                 # print("AMI: ", AMIVal[len(AMIVal) - 1])

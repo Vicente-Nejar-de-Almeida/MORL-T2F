@@ -5,15 +5,16 @@ import numpy as np
 class EpsilonGreedy:
     """Epsilon Greedy Exploration Strategy."""
 
-    def __init__(self, initial_epsilon=1.0, min_epsilon=0.0, decay=0.99):
+    def __init__(self, initial_epsilon=1.0, min_epsilon=0, decay=0.995):
         """Initialize Epsilon Greedy Exploration Strategy."""
         self.initial_epsilon = initial_epsilon
         self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
         self.decay = decay
 
-    def choose(self, q_table, state, action_space, legal_actions):
+    def choose(self, q_table, state, action_space, action_masks):
         """Choose action based on epsilon greedy strategy."""
+        legal_actions = [action for action, is_valid in enumerate(action_masks) if is_valid]
         if np.random.rand() < self.epsilon:
             action = random.choice(legal_actions)
         else:
@@ -44,9 +45,9 @@ class QLAgent:
         self.exploration = exploration_strategy
         self.acc_reward = 0
 
-    def act(self, legal_actions):
+    def act(self, action_masks):
         """Choose action based on Q-table."""
-        self.action = self.exploration.choose(self.q_table, self.state, self.action_space, legal_actions)
+        self.action = self.exploration.choose(self.q_table, self.state, self.action_space, action_masks)
         return self.action
 
     def learn(self, next_state, reward, done=False):

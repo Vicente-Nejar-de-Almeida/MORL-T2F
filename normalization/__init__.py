@@ -1,0 +1,2 @@
+from normalization.z_score_normalization import ZScoreNormalization
+from normalization.min_max_normalization import MinMaxNormalization
