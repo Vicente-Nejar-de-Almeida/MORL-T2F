@@ -2,12 +2,11 @@ import numpy as np
 
 
 class ZScoreNormalization:
-    def __init__(self, score_function, maximize=True, name=None, sample_limit=500):
+    def __init__(self, score_function, maximize=True, name=None):
         self.score_function = score_function
         self.observed_sample = []
         self.maximize = maximize  # indicates whether higher values are better (True) or worse (False)
         self.name = name
-        self.sample_limit = sample_limit
 
     def get_normalized_value(self, df_feat_all, y_pred):
         try:
@@ -15,8 +14,7 @@ class ZScoreNormalization:
         except:
             return None, -1
         else:
-            if len(self.observed_sample) < self.sample_limit:
-                self.observed_sample.append(data_point)
+            self.observed_sample.append(data_point)
         
 
         # return data_point, (data_point - min(self.observed_sample)) / (0.0001 + max(self.observed_sample) - min(self.observed_sample))
