@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from early_stopping_class import CustomEarlyStopping
+from early_stopping.early_stopping_class import CustomEarlyStopping
 
 
 def show_average_AMI(df):

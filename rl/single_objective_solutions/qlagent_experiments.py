@@ -1,11 +1,8 @@
 # Application of Time2Feat on real dataset
 import pickle
-import csv
 import time
 import numpy as np
-import pandas as pd
 from t2f.extraction.extractor import feature_extraction
-from t2f.utils.importance_old import feature_selection
 from t2f.model.clustering import ClusterWrapper
 from t2f.data.dataset import read_ucr_datasets
 from t2f.selection.selection import cleaning
@@ -15,12 +12,8 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
-from jqmcvi.base import dunn_fast
-import NormalizedScore as ns
-
-from scipy.stats import pearsonr
-from early_stopping_class import CustomEarlyStopping
+from sklearn.metrics import calinski_harabasz_score, silhouette_score
+from normalization import NormalizedScore as ns
 
 from rl.environments.feature_selection_env import FeatureSelectionEnvironment
 from rl.agents.ql_agent import QLAgent

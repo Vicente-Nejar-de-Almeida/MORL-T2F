@@ -1,10 +1,7 @@
 import math
-import sys
 import gym
 import numpy as np
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
-from jqmcvi.base import dunn_fast
-from early_stopping_class import CustomEarlyStopping
+from early_stopping.early_stopping_class import CustomEarlyStopping
 
 
 def obtain_score(df_feat_all, y_pred, list_eval):

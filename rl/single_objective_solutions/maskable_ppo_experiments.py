@@ -1,26 +1,8 @@
 # Application of Time2Feat on real dataset
-from stable_baselines3 import DQN
-from stable_baselines3.common.vec_env import DummyVecEnv
-from sb3_contrib.common.maskable.utils import get_action_masks
-from sb3_contrib.ppo_mask import MaskablePPO
-from tqdm import tqdm
-from early_stopping.plateau_early_stopping import PlateauEarlyStopping
-from normalization.min_max_normalization import MinMaxNormalization
-from normalization.z_score_normalization import ZScoreNormalization
-from rl.agents.ql_agent import QLAgent
-from rl.environments.new_feature_selection_env import NewFeatureSelectionEnvironment
-from early_stopping_class import CustomEarlyStopping
-from scipy.stats import pearsonr
-import NormalizedScore as ns
-from jqmcvi.base import dunn_fast
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
 import pickle
-import csv
 import time
 import numpy as np
-import pandas as pd
 from t2f.extraction.extractor import feature_extraction
-from t2f.utils.importance_old import feature_selection
 from t2f.model.clustering import ClusterWrapper
 from t2f.data.dataset import read_ucr_datasets
 from t2f.selection.selection import cleaning
@@ -30,6 +12,17 @@ import os
 import warnings
 warnings.filterwarnings("ignore")
 
+from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
+from jqmcvi.base import dunn_fast
+
+from rl.environments.new_feature_selection_env import NewFeatureSelectionEnvironment
+
+from normalization.z_score_normalization import ZScoreNormalization
+from early_stopping.plateau_early_stopping import PlateauEarlyStopping
+
+from sb3_contrib.ppo_mask import MaskablePPO
+from sb3_contrib.common.maskable.utils import get_action_masks
+from stable_baselines3.common.vec_env import DummyVecEnv
 
 if __name__ == '__main__':
     listNameDataset = ["ERing"]
@@ -42,21 +35,21 @@ if __name__ == '__main__':
 
     silhouette_norm = ZScoreNormalization(
         score_function=silhouette_score,
-        name='silhouette'
+        name='silhouette',
     )
-
+    
     calinski_norm = ZScoreNormalization(
         score_function=calinski_harabasz_score,
-        name='calinski_harabasz'
+        name='calinski_harabasz',
     )
     davies_bouldin_norm = ZScoreNormalization(
         score_function=davies_bouldin_score,
         maximize=False,  # minimum score is zero, with lower values indicating better clustering
-        name='davies_bouldin'
+        name='davies_bouldin',
     )
     dunn_index_norm = ZScoreNormalization(
         score_function=dunn_fast,
-        name='dunn_index'
+        name='dunn_index',
     )
 
     normalized_scorers = [
@@ -88,14 +81,14 @@ if __name__ == '__main__':
             labels = {i: j for i, j in zip(idx_train, y_train)}
             # print('Number of Labels: {}'.format(len(labels)))
 
-        if not os.path.isfile("data//"+nameDataset+"_feats.pkl"):
+        if not os.path.isfile("..//..//data//"+nameDataset+"_feats.pkl"):
             timeStart = time.time()
             df_all_feats = feature_extraction(ts_list, batch_size, p)
             extractTime = time.time() - timeStart
-            file = open("data//"+nameDataset+"_feats.pkl", 'wb')
+            file = open("..//..//data//"+nameDataset+"_feats.pkl", 'wb')
             pickle.dump(df_all_feats, file)
 
-        with open("data//"+nameDataset+"_feats.pkl", 'rb') as pickle_file:
+        with open("..//..//data//"+nameDataset+"_feats.pkl", 'rb') as pickle_file:
             df_all_feats = pickle.load(pickle_file)
 
         df_all_feats = cleaning(df_all_feats)
@@ -108,34 +101,40 @@ if __name__ == '__main__':
                 df_features=df_all_feats,
                 n_features=n_features,
                 clustering_model=model,
-                early_stopping=PlateauEarlyStopping(
-                    patience=10, plateau_patience=10),
+                early_stopping=PlateauEarlyStopping(patience=20, plateau_patience=20),
                 normalized_scorers=normalized_scorers
             )
-
-        env = make_env()
-        agent = DQN(
-            env=env,
-            policy="MlpPolicy",
-            learning_rate=0.1,
-            learning_starts=0,
-            train_freq=1,
-            target_update_interval=500,
-            exploration_initial_eps=1.0,
-            exploration_final_eps=0.05,
-            verbose=1,
+        
+        env = DummyVecEnv([make_env])
+        agent = MaskablePPO(
+            "MlpPolicy",
+            env,
+            learning_rate=0.001,
+            n_steps=50,
+            batch_size=32,
+            n_epochs=10,
+            gamma=1,
+            gae_lambda=0.9,
+            clip_range=0.2,
+            clip_range_vf=None,
+            normalize_advantage=True,
+            ent_coef=0.0,
+            vf_coef=0.5,
+            max_grad_norm=0.5,
+            verbose=1
         )
-        agent.learn(total_timesteps=1000, log_interval=1)
+        agent.learn(total_timesteps=10, log_interval=1)
 
         env = make_env()
         obs = env.reset()
         done = False
         while not done:
-            action, _states = agent.predict(obs, deterministic=True)
+            action_masks = get_action_masks(env)
+            action, _states = agent.predict(obs, deterministic=True, action_masks=action_masks)
             obs, reward, done, info = env.step(action)
             del info['legal_actions']
             print(f'Action: {action}, Reward: {reward}, Info: {info}')
-
+        
         # print(obs)
         # print(df_all_feats)
         # print(df_all_feats.iloc[:, obs])

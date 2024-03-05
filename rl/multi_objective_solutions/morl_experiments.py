@@ -2,9 +2,7 @@
 import pickle
 
 import numpy as np
-import pandas as pd
 from t2f.extraction.extractor import feature_extraction
-from t2f.utils.importance_old import feature_selection
 from t2f.model.clustering import ClusterWrapper
 from t2f.data.dataset import read_ucr_datasets
 from t2f.selection.selection import cleaning
@@ -12,13 +10,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import adjusted_mutual_info_score
 import os
 
-from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
-from jqmcvi.base import dunn_fast
-import NormalizedScore as ns
-
+from sklearn.metrics import calinski_harabasz_score, silhouette_score
+from normalization import NormalizedScore as ns
 
 from rl.environments.multi_objective_feature_selection_env import MultiObjectiveFeatureSelectionEnvironment
-from rl.agents.ql_agent import QLAgent
 
 from morl_baselines.multi_policy.envelope.envelope import Envelope
 
@@ -55,12 +50,12 @@ if __name__ == '__main__':
             labels = {i: j for i, j in zip(idx_train, y_train)}
             print('Number of Labels: {}'.format(len(labels)))
 
-        if not os.path.isfile("data//"+nameDataset+"_feats.pkl"):
+        if not os.path.isfile("..//..//data//"+nameDataset+"_feats.pkl"):
             df_all_feats = feature_extraction(ts_list, batch_size, p)
-            file = open("data//"+nameDataset+"_feats.pkl", 'wb')
+            file = open("..//..//data//"+nameDataset+"_feats.pkl", 'wb')
             pickle.dump(df_all_feats, file)
 
-        with open("data//"+nameDataset+"_feats.pkl", 'rb') as pickle_file:
+        with open("..//..//data//"+nameDataset+"_feats.pkl", 'rb') as pickle_file:
             df_all_feats = pickle.load(pickle_file)
 
         df_all_feats = cleaning(df_all_feats)
@@ -116,7 +111,7 @@ if __name__ == '__main__':
         )
 
         agent.train(
-            total_timesteps=4000,
+            total_timesteps=4,
             total_episodes=episodes,
             weight=None,
             eval_env=env,
