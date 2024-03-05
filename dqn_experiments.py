@@ -40,25 +40,23 @@ if __name__ == '__main__':
     p = os.cpu_count()
     header = ["Dataset", "n_feats", "AMI", "Time"]
 
-    silhouette_norm = MinMaxNormalization(
+    silhouette_norm = ZScoreNormalization(
         score_function=silhouette_score,
-        min_val=-1,
-        max_val=1,
-        name='silhouette',
+        name='silhouette'
     )
 
     calinski_norm = ZScoreNormalization(
         score_function=calinski_harabasz_score,
-        name='calinski_harabasz',
+        name='calinski_harabasz'
     )
     davies_bouldin_norm = ZScoreNormalization(
         score_function=davies_bouldin_score,
         maximize=False,  # minimum score is zero, with lower values indicating better clustering
-        name='davies_bouldin',
+        name='davies_bouldin'
     )
     dunn_index_norm = ZScoreNormalization(
         score_function=dunn_fast,
-        name='dunn_index',
+        name='dunn_index'
     )
 
     normalized_scorers = [

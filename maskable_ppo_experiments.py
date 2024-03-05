@@ -46,10 +46,8 @@ if __name__ == '__main__':
     p = os.cpu_count()
     header = ["Dataset", "n_feats", "AMI", "Time"]
 
-    silhouette_norm = MinMaxNormalization(
+    silhouette_norm = ZScoreNormalization(
         score_function=silhouette_score,
-        min_val=-1,
-        max_val=1,
         name='silhouette',
     )
     
