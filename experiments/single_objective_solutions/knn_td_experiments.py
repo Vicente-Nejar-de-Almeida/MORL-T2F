@@ -182,6 +182,7 @@ if __name__ == '__main__':
                                     'episode': episode,
                                     'rewards': rewards,
                                     'features': features,
+                                    'y_pred': y_pred,
                                     'scores': env.scores_received,
                                     'AMI': AMI,
                                     'time': finTime,
@@ -196,4 +197,4 @@ if __name__ == '__main__':
                                 # print(env.current_state)
                                 obs = env.reset()
                                 done = False
-        results.to_csv(f'results/results_{nameDataset}.csv', index=False)
+        results.to_csv(f'results/knn_results_{nameDataset}.csv', index=False)
