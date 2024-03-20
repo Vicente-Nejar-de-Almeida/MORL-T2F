@@ -182,7 +182,7 @@ if __name__ == '__main__':
                                     'episode': episode,
                                     'rewards': rewards,
                                     'features': features,
-                                    'y_pred': y_pred,
+                                    'y_pred': str(y_pred),
                                     'scores': env.scores_received,
                                     'AMI': AMI,
                                     'time': finTime,
