@@ -1,6 +1,9 @@
 import pandas as pd
 import gym
 import numpy as np
+import copy
+from sklearn.preprocessing import MinMaxScaler
+
 from early_stopping.constants import IMPROVE, SAFE
 
 
@@ -30,12 +33,23 @@ def obtain_score(df_feat_all, y_pred, normalized_scorers):
     return score, real_scores, normalized_scores
 
 
-class FeatureSelectionEnv(gym.Env):
+class TestFeatureSelectionEnv(gym.Env):
 
     def __init__(self, df_features, n_features, clustering_model, early_stopping, normalized_scorers) -> None:
-        self.observation_space = gym.spaces.Box(0, 1, shape=(len(df_features.columns),), dtype=np.float32)
-        self.action_space = gym.spaces.Discrete(len(df_features.columns))
+        # self.observation_space = gym.spaces.Box(0, 1, shape=(len(df_features.columns),), dtype=np.float32)
+
+        self.observation_space = gym.spaces.Dict(
+            {
+                f'f{i}': gym.spaces.Box(0, 1, shape=(len(df_features),), dtype=float) for i in range(n_features)
+            }
+        )
+        self.action_space = gym.spaces.Discrete(2)
         self.all_features = df_features.copy()
+
+        self.normalized_features = df_features.copy()
+        scaler = MinMaxScaler()
+        self.normalized_features[self.normalized_features.columns] = scaler.fit_transform(self.normalized_features)
+
         self.n_features = n_features
         self.clustering_model = clustering_model
         self.early_stopping = early_stopping
@@ -43,20 +57,27 @@ class FeatureSelectionEnv(gym.Env):
         self.best_features = None
     
     def _get_obs(self) -> np.array:
-        return self.current_state
-    
-    def _get_features_selected(self):
-        return [feature for i, feature in enumerate(self.all_features.columns) if self.current_state[i]]
+        obs = {}
+        for i in range(self.n_features):
+            if len(self.features_selected) > i:
+                obs[f'f{i}'] = self.normalized_features[self.features_selected[i]].values
+            elif len(self.features_selected) == i:
+                obs[f'f{i}'] = self.normalized_features[self.normalized_features.columns[self.current_feature_index]].values
+            else:
+                obs[f'f{i}'] = np.zeros(len(self.normalized_features), dtype=np.float32)
+        # print(obs)
+        return obs
 
     def _get_info(self) -> dict:
         return {
             'real_scores': self.real_scores,
             'normalized_scores': self.normalized_scores,
-            'features_selected': self._get_features_selected(),
+            'features_selected': self.features_selected,
         }
     
     def reset(self):
-        self.current_state = np.zeros(len(self.all_features.columns))
+        self.current_feature_index = 0
+        self.features_selected = []
         self.early_stopping.reset()
         observation = self._get_obs()
 
@@ -68,14 +89,12 @@ class FeatureSelectionEnv(gym.Env):
         # info = self._get_info()
         return observation
     
-    def _get_reward(self, action, same_action_selected):
+    def _get_reward(self, action):
         # selected_features = self.all_features.iloc[:, self.current_state.astype(bool)]
-        selected_features = self.all_features[self._get_features_selected()]
-
-        if same_action_selected:
-            return 0, selected_features, self.previous_score
-
-        y_pred = self.clustering_model.fit_predict(selected_features)
+        if len(self.features_selected) == 0:
+            return 0, 0
+        features = self.all_features[self.features_selected]
+        y_pred = self.clustering_model.fit_predict(features)
         
         try:
             """
@@ -99,26 +118,31 @@ class FeatureSelectionEnv(gym.Env):
         gain = score - self.previous_score
         self.previous_score = score
 
-        return gain, selected_features, score
+        return gain, score
     
     def step(self, action):
-        same_action_selected = bool(self.current_state[action])
-        self.current_state[action] = 1
-        reward, selected_features, score = self._get_reward(action, same_action_selected)
+        # print(f'Action: {action}')
+        if action == 0:
+            self.features_selected.append(self.normalized_features.columns[self.current_feature_index])
+        self.current_feature_index += 1
+
+        reward, score = self._get_reward(action)
         observation = self._get_obs()
         info = self._get_info()
 
-        n_features_selected = len(self._get_features_selected())
-        if n_features_selected < self.n_features:
-            check_continuation = self.early_stopping.update_metric(score)
-            if check_continuation == IMPROVE:
-                self.best_features = selected_features
-                done = False
-            elif check_continuation == SAFE:
-                done = False
-            else:
-                done = True
+        check_continuation = self.early_stopping.update_metric(score)
+        if check_continuation == IMPROVE:
+            self.best_features = copy.deepcopy(self.features_selected)
+            done = False
+        elif check_continuation == SAFE:
+            done = False
         else:
+            done = True
+        
+        if len(self.features_selected) < 5:
+            done = False
+        
+        if (len(self.features_selected) - 1 >= self.n_features) or (self.current_feature_index == len(self.all_features.columns) - 1):
             done = True
 
         return observation, reward, done, info
@@ -131,7 +155,3 @@ class FeatureSelectionEnv(gym.Env):
     
     def close(self):
         pass
-
-    def action_masks(self):
-        mask = [False if feat else True for feat in self._get_obs()]
-        return mask

@@ -24,7 +24,7 @@ def obtain_score(df_feat_all, y_pred, list_eval):
         return np.array(scoreTotal)
 
 
-class MultiObjectiveFeatureSelectionEnvironment(gym.Env):
+class MOFeatureSelectionEnv(gym.Env):
 
     def __init__(self, df_features, n_features, clustering_model, list_eval) -> None:
         self.observation_space = Box(0, 1, shape=(len(df_features.columns),), dtype=np.float32)

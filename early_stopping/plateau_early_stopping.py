@@ -1,7 +1,8 @@
 from early_stopping.constants import IMPROVE, SAFE, STOP
+from early_stopping.early_stopping import EarlyStopping
 
 
-class PlateauEarlyStopping:
+class PlateauEarlyStopping(EarlyStopping):
     def __init__(self, patience=10, plateau_patience=20, threshold=0.02):
         self.patience = patience
         self.plateau_patience = plateau_patience

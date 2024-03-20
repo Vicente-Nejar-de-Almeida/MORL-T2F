@@ -33,6 +33,3 @@ def read_ucr_datasets(nameDataset: str) -> Tuple[np.ndarray, np.ndarray]:
     ts_list, y = load_classification(nameDataset)
     ts_list = np.transpose(ts_list, (0, 2, 1))
     return ts_list, y
-
-
-

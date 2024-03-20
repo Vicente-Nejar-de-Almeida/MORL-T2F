@@ -20,6 +20,7 @@ def cleaning(df: pd.DataFrame) -> pd.DataFrame:
     df = df[top_features]
     featRemoved = pfa_scoring(df, 0.9)
     df = df[featRemoved[0]]
+    # print(f'N features:', len(df.columns))
     return df
 
 
