@@ -33,7 +33,7 @@ from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    dataset_names = ["ERing", "RacketSports"]
+    dataset_names = ["Libras"]
     # dataset_names = ["ERing"]
     transform_type = 'minmax'
     model_type = 'Hierarchical'
@@ -121,7 +121,6 @@ if __name__ == '__main__':
                 for decay_episodes in [10, 20, 30]:
                     print(f'decay_episodes: {decay_episodes}')
                     start_time = time.time()
-
                     env = FeatureSelectionEnv(
                         df_features=df_all_feats,
                         n_features=n_features,
@@ -133,10 +132,8 @@ if __name__ == '__main__':
                             threshold=0.03
                         )
                     )
-
                     obs = env.reset()
                     done = False
-
                     runs = 3
                     for run in range(runs):
                         for episodes in episodes_total:
@@ -189,12 +186,16 @@ if __name__ == '__main__':
                                     **env.real_scores,
                                     **env.normalized_scores,
                                 })
-                                if results is None:
+                                '''if results is None:
                                     results = new_results.copy()
                                 else:
-                                    results = pd.concat([results, new_results])
+                                    results = pd.concat([results, new_results])'''
 
+                                # Append the DataFrame to the CSV file
+                                new_results.to_csv(f"results/knn_results_{nameDataset}.csv", mode='a', index=False)
+                                new_results.to_json(f"results/knn_results_{nameDataset}.json", orient='records')
                                 # print(env.current_state)
                                 obs = env.reset()
                                 done = False
+
         results.to_csv(f'results/knn_results_{nameDataset}.csv', index=False)
