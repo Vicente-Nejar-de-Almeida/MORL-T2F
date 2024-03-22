@@ -90,14 +90,10 @@ def run_experiment(params):
                     **env.real_scores,
                     **env.normalized_scores,
                 })
-                if results is None:
-                    results = new_results.copy()
-                else:
-                    results = pd.concat([results, new_results])
                 obs = env.reset()
                 done = False
-                results.to_csv(f'results/knn_results_{nameDataset}.csv', mode='a',index=False)
-                results.to_json(f"results/knn_results_{nameDataset}.json", orient='records')
+                new_results.to_csv(f'results/knn_results_{nameDataset}.csv', mode='a',index=False)
+
 
 
 if __name__ == '__main__':
