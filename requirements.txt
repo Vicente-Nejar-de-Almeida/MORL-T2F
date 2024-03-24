@@ -71,7 +71,6 @@ isoduration==20.11.0
 jedi==0.19.1
 Jinja2==3.1.2
 joblib==1.3.2
-jqmcvi @ git+https://github.com/jqmviegas/jqm_cvi.git
 json5==0.9.14
 jsonpointer==2.4
 jsonschema==4.20.0
@@ -210,3 +209,4 @@ widgetsnbextension==4.0.9
 wrapt==1.16.0
 zict==3.0.0
 zipp==3.17.0
+jqmcvi @ git+https://github.com/jqmviegas/jqm_cvi.git
