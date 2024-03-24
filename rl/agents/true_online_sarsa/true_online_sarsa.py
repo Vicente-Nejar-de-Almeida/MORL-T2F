@@ -9,15 +9,17 @@ class TrueOnlineSarsaLambda:
     # Reference: True Online Temporal-Difference Learning (https://arxiv.org/pdf/1512.04087.pdf)
     
 
-    def __init__(self, state_space, action_space, basis='fourier', min_max_norm=False, alpha=0.0001, lamb=0.9, gamma=1, fourier_order=7, max_non_zero_fourier=2, initial_epsilon=1.0, min_epsilon=0.05, epsilon_decay=0.999):
+    def __init__(self, state_space, action_space, basis='fourier', min_max_norm=False, alpha=0.0001, lamb=0.9, gamma=1, fourier_order=7, max_non_zero_fourier=2, initial_epsilon=1.0, min_epsilon=0.0, decay_episodes=20):
         self.alpha = alpha
         self.lr = alpha
         self.lamb = lamb
         self.gamma = gamma
         self.epsilon = initial_epsilon
 
+        self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
-        self.epsilon_decay = epsilon_decay
+        self.decay = (initial_epsilon - min_epsilon) / decay_episodes
+        self.episode = 0
 
         self.state_space = state_space
         self.state_dim = self.state_space.shape[0]
@@ -43,7 +45,7 @@ class TrueOnlineSarsaLambda:
         next_phi = self.get_features(next_state)
         q = self.get_q_value(phi, action)
         if not done:
-            next_q = self.get_q_value(next_phi, self.get_action(next_phi, action_masks))
+            next_q = self.get_q_value(next_phi, self.get_action(next_phi, action_masks, None))
             # next_q = self.get_q_value(next_phi, self.get_action(next_phi))
         else:
             next_q = 0.0
@@ -76,13 +78,13 @@ class TrueOnlineSarsaLambda:
         for a in range(self.action_dim):
             self.et[a].fill(0.0)
     
-    def act(self, obs, action_masks):
+    def act(self, obs, action_masks, episode):
     # def act(self, obs):
         features = self.get_features(obs)
-        return self.get_action(features, action_masks)
+        return self.get_action(features, action_masks, episode)
         # return self.get_action(features)
 
-    def get_action(self, features, action_masks):
+    def get_action(self, features, action_masks, episode):
     # def get_action(self, features):
         legal_actions = [action for action, is_valid in enumerate(action_masks) if is_valid]
         action = None
@@ -94,5 +96,8 @@ class TrueOnlineSarsaLambda:
             legal_actions_index = np.argmax([self.get_q_value(features, legal) for legal in legal_actions])
             action = legal_actions[legal_actions_index]
             # return q_values.index(max(q_values))
-        self.epsilon *= self.epsilon_decay
+        # self.epsilon *= self.epsilon_decay
+        if (self.episode is not None) and (self.episode != episode):
+            self.episode = episode
+            self.epsilon = max(self.epsilon - self.decay, self.min_epsilon)
         return action

@@ -32,7 +32,7 @@ def obtain_score(df_feat_all, y_pred, normalized_scorers):
 
 class FeatureSelectionEnv(gym.Env):
 
-    def __init__(self, df_features, n_features, clustering_model, early_stopping, normalized_scorers) -> None:
+    def __init__(self, df_features, n_features, clustering_model, early_stopping, normalized_scorers, fixed_features=[]) -> None:
         self.observation_space = gym.spaces.Box(0, 1, shape=(len(df_features.columns),), dtype=np.float32)
         self.action_space = gym.spaces.Discrete(len(df_features.columns))
         self.all_features = df_features.copy()
@@ -41,12 +41,14 @@ class FeatureSelectionEnv(gym.Env):
         self.early_stopping = early_stopping
         self.normalized_scorers = normalized_scorers
         self.best_features = None
+        self.fixed_features = fixed_features
     
     def _get_obs(self) -> np.array:
         return self.current_state
     
     def _get_features_selected(self):
-        return [feature for i, feature in enumerate(self.all_features.columns) if self.current_state[i]]
+        # return [feature for i, feature in enumerate(self.all_features.columns) if self.current_state[i]]
+        return self.features_selected
 
     def _get_info(self) -> dict:
         return {
@@ -56,19 +58,28 @@ class FeatureSelectionEnv(gym.Env):
         }
     
     def reset(self):
+        self.features_selected = []
         self.current_state = np.zeros(len(self.all_features.columns))
         self.early_stopping.reset()
         observation = self._get_obs()
 
-        self.previous_score = 0
         self.real_scores = {score_function.name: [] for score_function in self.normalized_scorers}
         self.normalized_scores = {score_function.name + '_norm': [] for score_function in self.normalized_scorers}
         self.scores_received = []
+        self.previous_score = 0
+        
+        if len(self.fixed_features) > 0:
+            feature_names = list(self.all_features.columns)
+            for feature in self.fixed_features:
+                i = feature_names.index(feature)
+                self.current_state[i] = 1
+                self.features_selected.append(feature)
+            _, _, _ = self._get_reward(same_action_selected=False)  # in order to update previous score
 
         # info = self._get_info()
         return observation
     
-    def _get_reward(self, action, same_action_selected):
+    def _get_reward(self, same_action_selected):
         # selected_features = self.all_features.iloc[:, self.current_state.astype(bool)]
         selected_features = self.all_features[self._get_features_selected()]
 
@@ -104,7 +115,8 @@ class FeatureSelectionEnv(gym.Env):
     def step(self, action):
         same_action_selected = bool(self.current_state[action])
         self.current_state[action] = 1
-        reward, selected_features, score = self._get_reward(action, same_action_selected)
+        self.features_selected.append(self.all_features.columns[action])
+        reward, selected_features, score = self._get_reward(same_action_selected)
         observation = self._get_obs()
         info = self._get_info()
 

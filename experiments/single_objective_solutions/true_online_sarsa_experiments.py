@@ -147,7 +147,7 @@ if __name__ == '__main__':
                                 fourier_order=fourier_order,
                                 initial_epsilon=1.0,
                                 min_epsilon=0.05,
-                                epsilon_decay=0.999,
+                                decay_episodes=20
                             )
 
                             y_pred = y_true
@@ -158,7 +158,7 @@ if __name__ == '__main__':
                                 features = []
                                 while not done:
                                     action_masks = get_action_masks(env)
-                                    action = agent.act(obs=tuple(obs), action_masks=action_masks)
+                                    action = agent.act(obs=tuple(obs), action_masks=action_masks, episode=episode)
                                     # print('Action:', action)
                                     next_obs, reward, done, info = env.step(action)
                                     # print(next_obs)

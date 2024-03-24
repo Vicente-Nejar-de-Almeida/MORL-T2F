@@ -29,7 +29,6 @@ class KNNTDAgent:
         self.alpha = alpha
         self.gamma = gamma
 
-        self.initial_epsilon = initial_epsilon
         self.epsilon = initial_epsilon
         self.min_epsilon = min_epsilon
         self.decay = (initial_epsilon - min_epsilon) / decay_episodes
