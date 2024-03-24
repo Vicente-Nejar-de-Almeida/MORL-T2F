@@ -18,8 +18,9 @@ from rl.agents.true_online_sarsa.true_online_sarsa import TrueOnlineSarsaLambda
 data_path = 'data/'
 datasets = {}
 for dataset_file in os.listdir(data_path):
-    dataset_name = dataset_file[:dataset_file.find('_feats')]
-    datasets[dataset_name] = dataset_file
+    if 'pkl' in dataset_file:
+        dataset_name = dataset_file[:dataset_file.find('_feats')]
+        datasets[dataset_name] = dataset_file
 
 
 """Available RL agents"""
@@ -80,7 +81,7 @@ def open_dataset(dataset):
     model_type = 'Hierarchical'
     transform_type = 'minmax'
 
-    ts_list, y_true = read_ucr_datasets(nameDataset=dataset)
+    ts_list, y_true = read_ucr_datasets(nameDataset=dataset, extract_path=data_path)
     n_clusters = len(set(y_true))  # Get number of clusters to find
 
     # Create cluster model

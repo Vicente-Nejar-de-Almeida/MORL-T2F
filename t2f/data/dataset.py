@@ -27,9 +27,9 @@ def read_ucr_mts(path: str) -> Tuple[List[np.ndarray], list]:
     return ts_list, list(y)
 
 
-def read_ucr_datasets(nameDataset: str) -> Tuple[np.ndarray, np.ndarray]:
+def read_ucr_datasets(nameDataset: str, extract_path=None) -> Tuple[np.ndarray, np.ndarray]:
     """ Read ucr datasets
     """
-    ts_list, y = load_classification(nameDataset)
+    ts_list, y = load_classification(nameDataset, extract_path=extract_path)
     ts_list = np.transpose(ts_list, (0, 2, 1))
     return ts_list, y
