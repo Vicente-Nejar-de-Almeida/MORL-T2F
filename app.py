@@ -3,6 +3,7 @@ import copy
 import streamlit as st
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from sb3_contrib.common.maskable.utils import get_action_masks
 
@@ -11,6 +12,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 
 from sklearn.metrics import adjusted_mutual_info_score
+from sklearn.metrics.cluster import contingency_matrix
 
 from early_stopping import PlateauEarlyStopping
 from rl.environments.feature_selection_env import FeatureSelectionEnv
@@ -18,8 +20,29 @@ from rl.environments.feature_selection_env import FeatureSelectionEnv
 from utils import *
 
 
-if 'reset_rl_state' not in st.session_state:
-    st.session_state.reset_rl_state = False
+COLS_IN_PLOT = 2
+
+
+def reset_local_info_tab1():
+    st.session_state.tab1_local_metrics = {k: [] for k in metric_names.keys()}
+    st.session_state.tab1_local_rewards = []
+
+
+def update_global_info_tab1():
+    for k, v in st.session_state.tab1_local_metrics.items():
+        st.session_state.tab1_global_metrics[k].append(v[-1])
+    st.session_state.tab1_global_rewards.append(sum(st.session_state.tab1_local_rewards))
+
+
+def reset_tab1():
+    st.session_state.tab1_running = False
+    reset_local_info_tab1()
+    st.session_state.tab1_local_features = []
+    st.session_state.tab1_global_metrics = {k: [] for k in metric_names.keys()}
+    st.session_state.tab1_global_rewards = []
+    st.session_state.tab1_episode = 0
+    st.session_state.tab1_step = 0
+
 
 
 st.set_page_config(
@@ -34,136 +57,100 @@ customized_button = st.markdown('''
     </style>''', unsafe_allow_html=True
 )
 
-selected_dataset = st.sidebar.selectbox(
-    'Select a dataset',
-    tuple(sorted(dataset for dataset in datasets.keys()))
-)
+with st.sidebar:
 
-if ('dataset' not in st.session_state) or (st.session_state.dataset != selected_dataset):
-    st.session_state.dataset = selected_dataset
-    st.session_state.df_all_feats, st.session_state.y_true, st.session_state.model = open_dataset(selected_dataset)
-
-selected_agent = st.sidebar.selectbox(
-    'Select an RL agent',
-    tuple(agent for agent in rl_agents.keys())
-)
-
-st.sidebar.header('Hyperparameters')
-
-parameters = {}
-for parameter, details in rl_agents[selected_agent]['parameters'].items():
-    parameter_label = 'Select a value for ' + details[0]
-    parameter_min_value = details[1]
-    parameter_max_value = details[2]
-    parameter_default_value = details[3]
-    if parameter != 'alpha':
-        parameters[parameter] = st.sidebar.slider(
-            parameter_label,
-            parameter_min_value,
-            parameter_max_value,
-            parameter_default_value
-        )
-    else:
-        parameters[parameter] = st.sidebar.number_input(
-            label=parameter_label,
-            min_value=parameter_min_value,
-            step=0.00001,
-            max_value=parameter_max_value,
-            value=parameter_default_value,
-            format='%f'
-        )
-
-st.title('Time2ReinforcedFeat')
-
-if 'episode' not in st.session_state:
-    st.session_state.episode = None
-
-
-def start():
-    st.session_state.episode = 0
-    st.session_state.step = 0
-    st.session_state.reset_rl_state = True
-
-
-def reset():
-    st.session_state.episode = None
-    st.session_state.step = 0
-
-
-if 'fixed_features' not in st.session_state:
-    st.session_state.fixed_features = []
-
-
-if st.session_state.episode is None:
-    st.session_state.fixed_features = st.multiselect(
-        'Fixed features (optional)',
-        st.session_state.df_all_feats.columns,
-        []
+    selected_dataset = st.selectbox(
+        'Select a dataset',
+        tuple(sorted(dataset for dataset in datasets.keys())),
+        on_change=reset_tab1,
     )
 
-    st.header('Early stopping')
+    if ('dataset' not in st.session_state) or (st.session_state.dataset != selected_dataset):
+        st.session_state.dataset = selected_dataset
+        st.session_state.ts_list, st.session_state.y_true, st.session_state.df_all_feats, st.session_state.model = open_dataset(selected_dataset)
+        possible_labels = sorted(set(st.session_state.y_true))
+        st.session_state.y_true_colors = {label: sns.color_palette("husl", n_colors=len(possible_labels)).as_hex()[i] for i, label in enumerate(possible_labels)}
+
+    selected_agent = st.selectbox(
+        'Select an RL agent',
+        tuple(agent for agent in rl_agents.keys()),
+        on_change=reset_tab1,
+    )
+
+    with st.expander('RL Hyperparameters', expanded=False):
+        parameters = {}
+        for parameter, details in rl_agents[selected_agent]['parameters'].items():
+            parameter_label = 'Select a value for ' + details[0]
+            parameter_min_value = details[1]
+            parameter_max_value = details[2]
+            parameter_default_value = details[3]
+            if parameter != 'alpha':
+                parameters[parameter] = st.slider(
+                    parameter_label,
+                    parameter_min_value,
+                    parameter_max_value,
+                    parameter_default_value
+                )
+            else:
+                parameters[parameter] = st.number_input(
+                    label=parameter_label,
+                    min_value=parameter_min_value,
+                    step=0.00001,
+                    max_value=parameter_max_value,
+                    value=parameter_default_value,
+                    format='%f'
+                )
     
-    st.session_state.patience = st.slider(
+    with st.expander('Early Stopping', expanded=False):
+        st.session_state.patience = st.slider(
             'Patience',
             1,
             50,
             20,
-    )
+        )
 
-    st.session_state.plateau_patience = st.slider(
+        st.session_state.plateau_patience = st.slider(
             'Plateau Patience',
             1,
             50,
             20,
-    )
+        )
 
-    st.session_state.threshold = st.slider(
+        st.session_state.threshold = st.slider(
             'Threshold',
             0.0,
             1.0,
             0.03,
-    )
-
-    st.button('Start', type='secondary', on_click=start)
-else:
+        )
     
-    def reset_episode():
-        
-        if len(st.session_state.local_rewards) > 0:
-            st.session_state.global_rewards.append(sum(st.session_state.local_rewards))
 
-        if len(st.session_state.local_silhouette) > 0:
-            st.session_state.global_silhouette.append(st.session_state.local_silhouette[-1])
-            st.session_state.global_calinski_harabasz.append(st.session_state.local_calinski_harabasz[-1])
-            st.session_state.global_davies_bouldin.append(st.session_state.local_davies_bouldin[-1])
-            st.session_state.global_dunn_index.append(st.session_state.local_dunn_index[-1])
+st.title('Time2ReinforcedFeat')
 
-        st.session_state.episode += 1
-        st.session_state.step = 0
-        st.session_state.done = False
-        st.session_state.obs = st.session_state.env.reset()
 
-        info = st.session_state.env._get_info()
-        real_scores = info['real_scores']
-        if len(real_scores['silhouette']) > 0:
-            st.session_state.local_silhouette = [real_scores['silhouette'][0]]
-            st.session_state.local_calinski_harabasz = [real_scores['calinski_harabasz'][0]]
-            st.session_state.local_davies_bouldin = [real_scores['davies_bouldin'][-1]]
-            st.session_state.local_dunn_index = [real_scores['dunn_index'][-1]]
+def display_metric(local_metrics):
+        if len(local_metrics) > 0:
+            metric = local_metrics[-1]
         else:
-            st.session_state.local_silhouette = [np.nan]
-            st.session_state.local_calinski_harabasz = [np.nan]
-            st.session_state.local_davies_bouldin = [np.nan]
-            st.session_state.local_dunn_index = [np.nan]
+            metric = np.nan
+        
+        if math.isnan(metric):
+            return '-'
+        else:
+            return round(metric, 4)
 
-        st.session_state.local_rewards = []
-        st.session_state.local_features = []
 
-    if st.session_state.reset_rl_state:
-        st.session_state.run_training = False
-        st.session_state.run_episode = False
-        st.session_state.next_episode = False
-        st.session_state.env = FeatureSelectionEnv(
+tab1, tab2, tab3 = st.tabs(["Automatic Feature Selection", "Fixed Features at Initialization", "Ground Truth"])
+
+
+with tab1:
+    if 'tab1_running' not in st.session_state:
+        reset_tab1()
+
+
+    def start_tab1():
+        reset_tab1()
+        st.session_state.tab1_running = True
+        st.session_state.tab1_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
             n_features=50,
             clustering_model=st.session_state.model,
@@ -173,181 +160,253 @@ else:
                 plateau_patience=st.session_state.plateau_patience,
                 threshold=st.session_state.threshold
             ),
-            fixed_features=st.session_state.fixed_features,
         )
-        st.session_state.obs = st.session_state.env.reset()
-        st.session_state.agent = get_agent(selected_agent, parameters, st.session_state.env, st.session_state.obs)
+        st.session_state.tab1_obs = st.session_state.tab1_env.reset()
+        st.session_state.tab1_agent = get_agent(selected_agent, parameters, st.session_state.tab1_env, st.session_state.tab1_obs)
+        st.session_state.tab1_done = False
+
+    
+    def new_episode_tab1():
+        st.session_state.tab1_obs = st.session_state.tab1_env.reset()
+        update_global_info_tab1()
+        reset_local_info_tab1()
+        st.session_state.tab1_episode += 1
+        st.session_state.tab1_step  = 0
+        st.session_state.tab1_done = False
+
+
+    def run_step_tab1():
+        if not st.session_state.tab1_running:
+            start_tab1()
         
-        st.session_state.local_silhouette = []
-        st.session_state.local_calinski_harabasz = []
-        st.session_state.local_davies_bouldin = []
-        st.session_state.local_dunn_index = []
-        st.session_state.local_rewards = []
-        st.session_state.local_features = []
-        reset_episode()
-        st.session_state.global_rewards = []
-        st.session_state.global_silhouette = []
-        st.session_state.global_calinski_harabasz = []
-        st.session_state.global_davies_bouldin = []
-        st.session_state.global_dunn_index = []
-        st.session_state.reset_rl_state = False
-        st.session_state.disable_buttons = False
+        if st.session_state.tab1_done:
+            new_episode_tab1()
+        
+        action_masks = get_action_masks(st.session_state.tab1_env)
+        action = get_action(st.session_state.tab1_agent, st.session_state.tab1_obs, action_masks, st.session_state.tab1_episode)
+        
+        next_obs, reward, st.session_state.tab1_done, info = st.session_state.tab1_env.step(action)
+        st.session_state.tab1_local_rewards.append(reward)
 
-
-    def run_episode():
-        st.session_state.disable_buttons = True
-        st.session_state.run_training = True
-        st.session_state.run_episode = True
-    
-    def run_step():
-        st.session_state.disable_buttons = True
-        st.session_state.run_training = True
-    
-    def next_episode():
-        st.session_state.disable_buttons = True
-        st.session_state.next_episode = True
-
-    
-    def step_rl():
-        if st.session_state.done:
-            reset_episode()
-
-        action_masks = get_action_masks(st.session_state.env)
-        action = get_action(st.session_state.agent, st.session_state.obs, action_masks, st.session_state.episode)
-        next_obs, reward, st.session_state.done, info = st.session_state.env.step(action)
-        st.session_state.local_rewards.append(reward)
         features_selected = info['features_selected']
-        st.session_state.local_features = copy.deepcopy(features_selected)
+        st.session_state.tab1_local_features = copy.deepcopy(features_selected)
+
         real_scores = info['real_scores']
+        for k in st.session_state.tab1_local_metrics.keys():
+            st.session_state.tab1_local_metrics[k].append(real_scores[k][-1])
+
+        learn(st.session_state.tab1_agent, st.session_state.tab1_obs, action, reward, next_obs, st.session_state.tab1_done, action_masks)
+        st.session_state.tab1_obs = next_obs
+        st.session_state.tab1_step += 1
         
+
+    def run_episode_tab1():
+        if not st.session_state.tab1_running:
+            start_tab1()
+        if st.session_state.tab1_done:
+            new_episode_tab1()
+        while not st.session_state.tab1_done:
+            run_step_tab1()
+
+
+    tab1_col1, tab1_col2, tab1_col3 = st.columns(3)
+    tab1_col1.button('Reset', type='primary', on_click=reset_tab1, disabled=(not st.session_state.tab1_running))
+    tab1_col2.button('Run episode', on_click=run_episode_tab1)
+    tab1_col3.button('Run step', on_click=run_step_tab1)
+
+    st.subheader(f'Episode {st.session_state.tab1_episode}, Step {st.session_state.tab1_step}')
+
+
+    # RL Performance (current episode)
+    with st.expander('RL Performance (current episode)', expanded=False):
+        tab1_metric_cols = st.columns(len(metric_names))
+        for i, k in enumerate(metric_names.keys()):
+            tab1_metric_cols[i].metric(metric_names[k], display_metric(st.session_state.tab1_local_metrics[k]))
         
-        st.session_state.local_silhouette.append(real_scores['silhouette'][-1])
-        st.session_state.local_calinski_harabasz.append(real_scores['calinski_harabasz'][-1])
-        st.session_state.local_davies_bouldin.append(real_scores['davies_bouldin'][-1])
-        st.session_state.local_dunn_index.append(real_scores['dunn_index'][-1])
+        tab1_current_episode_fig = make_subplots(
+            rows=math.ceil(len(metric_names)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
+            subplot_titles=tuple(k for k in metric_names.values()))
 
-        learn(st.session_state.agent, st.session_state.obs, action, reward, next_obs, st.session_state.done, action_masks)
-        st.session_state.obs = next_obs
-        st.session_state.step += 1
+        tab1_current_episode_fig_row = 1
+        tab1_current_episode_fig_col = 1
+        for k in metric_names.keys():
+            tab1_current_episode_fig.add_trace(
+                go.Scatter(
+                    x=[i for i in range(len(st.session_state.tab1_local_metrics[k]))],
+                    y=st.session_state.tab1_local_metrics[k]
+                ),
+                row=tab1_current_episode_fig_row,
+                col=tab1_current_episode_fig_col
+            )
 
-    button_col1, button_col2, button_col3, button_col4 = st.columns(4)
-    button_col1.button('Reset', type='primary', on_click=reset)
-    button_col2.button('Run episode', on_click=run_episode, disabled=st.session_state.disable_buttons)
-    button_col3.button('Next step', on_click=run_step, disabled=st.session_state.disable_buttons)
-    button_col4.button('Next episode', on_click=next_episode, disabled=(st.session_state.step == 0))
+            tab1_current_episode_fig.update_xaxes(
+                title_text="Step",
+                row=tab1_current_episode_fig_row,
+                col=tab1_current_episode_fig_col
+            )
 
-    if st.session_state.run_training:
-        if st.session_state.run_episode:
-            if st.session_state.done:
-                reset_episode()
-            while not st.session_state.done:
-                step_rl()
-            st.session_state.run_episode = False
-        else:
-            step_rl()
+            tab1_current_episode_fig_col += 1
+            if tab1_current_episode_fig_col > COLS_IN_PLOT:
+                tab1_current_episode_fig_col = 1
+                tab1_current_episode_fig_row += 1
         
-        st.session_state.run_training = False
-        st.session_state.disable_buttons = False
-        st.rerun()
-    
-    if st.session_state.next_episode:
-        reset_episode()
-        st.session_state.next_episode = False
-        st.session_state.disable_buttons = False
-        st.rerun()
-
-    st.subheader(f'Episode {st.session_state.episode}, Step {st.session_state.step}')
-
-
-    def display_metric(metric):
-        if math.isnan(metric):
-            return '-'
-        else:
-            return round(metric, 4)
-
-    with st.expander('RL Performance (current episode)', expanded=True):
-        metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
-        metric_col1.metric('Silhouette Coefficient', display_metric(st.session_state.local_silhouette[-1]))
-        metric_col2.metric('Calinski and Harabasz', display_metric(st.session_state.local_calinski_harabasz[-1]))
-        metric_col3.metric('Davies-Bouldin', display_metric(st.session_state.local_davies_bouldin[-1]))
-        metric_col4.metric('Dunn index', display_metric(st.session_state.local_dunn_index[-1]))
-
-        current_episode_fig = make_subplots(
-            rows=2, cols=2,
-            subplot_titles=("Silhouette Coefficient", "Calinski and Harabasz", "Davies-Bouldin", "Dunn index"))
-
-        current_episode_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.local_silhouette))], y=st.session_state.local_silhouette),
-                    row=1, col=1)
-
-        current_episode_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.local_calinski_harabasz))], y=st.session_state.local_calinski_harabasz),
-                    row=1, col=2)
-
-        current_episode_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.local_davies_bouldin))], y=st.session_state.local_davies_bouldin),
-                    row=2, col=1)
-
-        current_episode_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.local_dunn_index))], y=st.session_state.local_dunn_index),
-                    row=2, col=2)
-
-        current_episode_fig.update_layout(height=500, width=700,
+        tab1_current_episode_fig.update_layout(height=500, width=700,
                         title_text="Unsupervised Metrics", showlegend=False)
 
-        # Update xaxis properties
-        current_episode_fig.update_xaxes(title_text="Step", row=1, col=1)
-        current_episode_fig.update_xaxes(title_text="Step", row=1, col=2)
-        current_episode_fig.update_xaxes(title_text="Step", row=2, col=1)
-        current_episode_fig.update_xaxes(title_text="Step", row=2, col=2)
+        st.plotly_chart(tab1_current_episode_fig, theme="streamlit", use_container_width=True)
 
-        st.plotly_chart(current_episode_fig, theme="streamlit", use_container_width=True)
-
-        if len(st.session_state.local_rewards) > 0:
-            local_rewards_df = pd.DataFrame({'Cumulated Reward': st.session_state.local_rewards}).cumsum()
-            local_rewards_df['Step'] = [i for i in range(len(st.session_state.local_rewards))]
-            local_rewards_fig = px.line(local_rewards_df, x='Step', y='Cumulated Reward', markers=True, title='Cumulated Reward')
-            st.plotly_chart(local_rewards_fig, theme="streamlit", use_container_width=True)
+        tab1_local_rewards_df = pd.DataFrame({'Cumulated Reward': st.session_state.tab1_local_rewards}).cumsum()
+        tab1_local_rewards_df['Step'] = [i for i in range(len(st.session_state.tab1_local_rewards))]
+        tab1_local_rewards_fig = px.line(tab1_local_rewards_df, x='Step', y='Cumulated Reward', markers=True, title='Cumulated Reward')
+        st.plotly_chart(tab1_local_rewards_fig, theme="streamlit", use_container_width=True)
     
-    if st.session_state.episode > 1:
-        with st.expander('RL Performance (global)', expanded=False):
-            global_fig = make_subplots(
-                rows=2, cols=2,
-                subplot_titles=("Silhouette Coefficient", "Calinski and Harabasz", "Davies-Bouldin", "Dunn index"))
 
-            global_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.global_silhouette))], y=st.session_state.global_silhouette),
-                        row=1, col=1)
+    # RL Performance (global)
+    with st.expander('RL Performance (global)', expanded=False):
+        tab1_global_fig = make_subplots(
+            rows=math.ceil(len(metric_names)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
+            subplot_titles=tuple(k for k in metric_names.values()))
+        
+        tab1_global_fig_row = 1
+        tab1_global_fig_col = 1
 
-            global_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.global_calinski_harabasz))], y=st.session_state.global_calinski_harabasz),
-                        row=1, col=2)
+        for k in metric_names.keys():
+            tab1_global_fig.add_trace(
+                go.Scatter(
+                    x=[i for i in range(len(st.session_state.tab1_global_metrics[k]))],
+                    y=st.session_state.tab1_global_metrics[k]
+                ),
+                row=tab1_global_fig_row,
+                col=tab1_global_fig_col
+            )
 
-            global_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.global_davies_bouldin))], y=st.session_state.global_davies_bouldin),
-                        row=2, col=1)
+            tab1_global_fig.update_xaxes(
+                title_text="Episode",
+                row=tab1_global_fig_row,
+                col=tab1_global_fig_col
+            )
 
-            global_fig.add_trace(go.Scatter(x=[i for i in range(len(st.session_state.global_dunn_index))], y=st.session_state.global_dunn_index),
-                        row=2, col=2)
+            tab1_global_fig_col += 1
+            if tab1_global_fig_col > COLS_IN_PLOT:
+                tab1_global_fig_col = 1
+                tab1_global_fig_row += 1
+        
+        tab1_global_fig.update_layout(
+            height=500, width=700,
+            title_text="Unsupervised Metrics", showlegend=False
+        )
 
-            global_fig.update_layout(height=500, width=700,
-                            title_text="Unsupervised Metrics", showlegend=False)
+        st.plotly_chart(tab1_global_fig, theme="streamlit", use_container_width=True)
 
-            # Update xaxis properties
-            global_fig.update_xaxes(title_text="Episode", row=1, col=1)
-            global_fig.update_xaxes(title_text="Episode", row=1, col=2)
-            global_fig.update_xaxes(title_text="Episode", row=2, col=1)
-            global_fig.update_xaxes(title_text="Episode", row=2, col=2)
-
-            st.plotly_chart(global_fig, theme="streamlit", use_container_width=True)
-
-            if len(st.session_state.global_rewards) > 0:
-                global_rewards_df = pd.DataFrame({'Total Reward per Episode': st.session_state.global_rewards})
-                global_rewards_df['Episode'] = [i for i in range(len(st.session_state.global_rewards))]
-                global_rewards_df = px.line(global_rewards_df, x='Episode', y='Total Reward per Episode', markers=True, title='Total Reward per Episode')
-                st.plotly_chart(global_rewards_df, theme="streamlit", use_container_width=True)
+        tab1_global_rewards_df = pd.DataFrame({'Total Reward per Episode': st.session_state.tab1_global_rewards})
+        tab1_global_rewards_df['Episode'] = [i for i in range(len(st.session_state.tab1_global_rewards))]
+        tab1_global_rewards_fig = px.line(tab1_global_rewards_df, x='Episode', y='Total Reward per Episode', markers=True, title='Total Reward per Episode')
+        st.plotly_chart(tab1_global_rewards_fig, theme="streamlit", use_container_width=True)
     
+    # Selected Features
+    with st.expander('Selected Features', expanded=False):
+        if len(st.session_state.tab1_local_features) > 0:
+            st.markdown('**Feature names**')
+            st.table(pd.DataFrame({'Feature': st.session_state.tab1_local_features}))
+            features_df = st.session_state.df_all_feats[st.session_state.tab1_local_features]
+            st.markdown('**Feature values**')
+            st.dataframe(features_df)
+        else:
+            st.text('No feature selected')
     
-    if len(st.session_state.local_features) > 0:
-        with st.expander('Selected Features', expanded=True):
-            features_df = pd.DataFrame({'Features': st.session_state.local_features})
-            st.table(features_df)
-    
-    if len(st.session_state.local_features) > 0:
-        with st.expander('Clusters', expanded=True):
-            y_pred = st.session_state.model.fit_predict(st.session_state.df_all_feats[st.session_state.local_features])
-            AMI = adjusted_mutual_info_score(y_pred, st.session_state.y_true)
+    # Clusters
+    with st.expander('Clusters', expanded=False):
+        if len(st.session_state.tab1_local_features) > 0:
+            tab1_y_pred = st.session_state.model.fit_predict(st.session_state.df_all_feats[st.session_state.tab1_local_features])
+            AMI = adjusted_mutual_info_score(tab1_y_pred, st.session_state.y_true)
             st.metric('AMI', round(AMI, 4))
+
+            tab1_selected_signal = st.selectbox(
+                'Select the dimension of the time series',
+                tuple(f'Signal {i+1}' for i in range(len(st.session_state.ts_list[0][0])))
+            )
+            signal = int(tab1_selected_signal[len('Signal '):]) - 1
+
+            cluster_labels = list(sorted(set(st.session_state.y_true)))
+
+            contingency = contingency_matrix(st.session_state.y_true, tab1_y_pred)
+            already_assigned = []
+            pred_to_true = {}
+
+            real_labels = cluster_labels
+            prediction_labels = list(sorted(set(tab1_y_pred)))
+
+            for pred_label in prediction_labels:
+                c = contingency[:, pred_label]
+                m = np.zeros(c.size, dtype=bool)
+                m[already_assigned] = True
+                a = np.ma.array(c, mask=m)
+                true_label_index = np.argmax(a)
+                true_label = real_labels[true_label_index]
+                pred_to_true[pred_label] = true_label
+                already_assigned.append(true_label_index)
+
+            tab1_clusters_fig = make_subplots(
+                rows=math.ceil(len(cluster_labels)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
+                subplot_titles=tuple(f'Cluster {label}' for label in cluster_labels)
+            )
+        
+            tab1_clusters_fig_row = 1
+            tab1_clusters_fig_col = 1
+
+            for label in cluster_labels:
+                current_cluster_df = None
+                for time_series_id, predicted_cluster_id in enumerate(tab1_y_pred):
+                    predicted_label = pred_to_true[predicted_cluster_id]
+                    if str(predicted_label) == str(label):
+                        real_label = st.session_state.y_true[time_series_id]
+                        time_series = [ts[signal] for ts in st.session_state.ts_list[time_series_id]]
+                        tab1_clusters_fig.add_trace(
+                            go.Scatter(
+                                x=[i for i in range(len(time_series))],
+                                y=time_series,
+                                line={'color': st.session_state.y_true_colors[real_label]},
+                                name=f'Cluster {real_label}'
+                            ),
+                            row=tab1_clusters_fig_row,
+                            col=tab1_clusters_fig_col,
+                        )
+
+                tab1_clusters_fig.update_xaxes(
+                    # title_text=f'Time',
+                    row=tab1_clusters_fig_row,
+                    col=tab1_clusters_fig_col
+                )
+
+                tab1_clusters_fig_col += 1
+                if tab1_clusters_fig_col > COLS_IN_PLOT:
+                    tab1_clusters_fig_col = 1
+                    tab1_clusters_fig_row += 1
+            
+            tab1_clusters_fig.update_layout(
+                height=math.ceil(len(cluster_labels)/COLS_IN_PLOT) * 250, width=700,
+                title_text="Predicted Clusters", showlegend=False
+            )
+
+            st.plotly_chart(tab1_clusters_fig, theme="streamlit", use_container_width=True)
+
+        else:
+            st.text('No feature selected')
+
+
+with tab2:
+    st.session_state.fixed_features = st.multiselect(
+        'Fixed features (optional)',
+        st.session_state.df_all_feats.columns,
+        []
+    )
+    tab2_col1, tab2_col2, tab2_col3, tab2_col4 = st.columns(4)
+    tab2_col1.button('Reset', key='Reset 2', type='primary')
+    tab2_col2.button('Run episode', key='Run episode 2')
+    tab2_col3.button('Next step', key='Next step 2')
+    tab2_col4.button('Next episode', key='Next episode 2')
+
+
+with tab3:
+   st.header("An owl")
+   st.image("https://static.streamlit.io/examples/owl.jpg", width=200)

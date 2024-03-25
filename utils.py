@@ -47,6 +47,14 @@ rl_agents = {
 }
 
 
+metric_names = {
+    'silhouette': 'Silhouette Coefficient',
+    'calinski_harabasz': 'Calinski and Harabasz',
+    'davies_bouldin': 'Davies-Bouldin',
+    'dunn_index': 'Dunn index',
+}
+
+
 """Normalized metrics"""
 silhouette_norm = ZScoreNormalization(
     score_function=silhouette_score,
@@ -91,7 +99,9 @@ def open_dataset(dataset):
          df_all_feats = pickle.load(pickle_file)
     df_all_feats = cleaning(df_all_feats)
 
-    return df_all_feats, y_true, model
+    y_true = [int(y) for y in y_true]
+
+    return ts_list, y_true, df_all_feats, model
 
 
 def get_agent(selected_agent, parameters, env, obs):
