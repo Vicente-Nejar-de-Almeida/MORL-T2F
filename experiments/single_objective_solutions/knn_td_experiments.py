@@ -33,8 +33,7 @@ from tqdm import tqdm
 
 
 if __name__ == '__main__':
-    dataset_names = ["Libras"]
-    # dataset_names = ["ERing"]
+    dataset_names = ['BasicMotions', 'Libras', 'ERing', 'RacketSports']
     transform_type = 'minmax'
     model_type = 'Hierarchical'
     train_size = 0.3

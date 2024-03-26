@@ -23,6 +23,13 @@ from utils import *
 COLS_IN_PLOT = 2
 
 
+def cluster_label_to_string(label):
+    if isinstance(label, str) and re.search('[a-zA-Z]', label):
+        return label.capitalize()
+    else:
+        return f'Cluster {label}'
+
+
 # Tab 1
 def reset_local_info_tab1():
     st.session_state.tab1_local_metrics = {k: [np.nan] for k in metric_names.keys()}
@@ -397,7 +404,7 @@ with tab1:
 
             tab1_clusters_fig = make_subplots(
                 rows=math.ceil(len(cluster_labels)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
-                subplot_titles=tuple(f'Cluster {label}' for label in cluster_labels)
+                subplot_titles=tuple(cluster_label_to_string(label) for label in cluster_labels)
             )
         
             tab1_clusters_fig_row = 1
@@ -415,7 +422,7 @@ with tab1:
                                 x=[i for i in range(len(time_series))],
                                 y=time_series,
                                 line={'color': st.session_state.y_true_colors[real_label]},
-                                name=f'Cluster {real_label}'
+                                name=cluster_label_to_string(real_label)
                             ),
                             row=tab1_clusters_fig_row,
                             col=tab1_clusters_fig_col,
@@ -691,7 +698,7 @@ with tab2:
 
             tab2_clusters_fig = make_subplots(
                 rows=math.ceil(len(cluster_labels)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
-                subplot_titles=tuple(f'Cluster {label}' for label in cluster_labels)
+                subplot_titles=tuple(cluster_label_to_string(label) for label in cluster_labels)
             )
         
             tab2_clusters_fig_row = 1
@@ -709,7 +716,7 @@ with tab2:
                                 x=[i for i in range(len(time_series))],
                                 y=time_series,
                                 line={'color': st.session_state.y_true_colors[real_label]},
-                                name=f'Cluster {real_label}'
+                                name=cluster_label_to_string(real_label)
                             ),
                             row=tab2_clusters_fig_row,
                             col=tab2_clusters_fig_col,
@@ -749,7 +756,7 @@ with tab3:
 
     tab3_clusters_fig = make_subplots(
         rows=math.ceil(len(cluster_labels)/COLS_IN_PLOT), cols=COLS_IN_PLOT,
-        subplot_titles=tuple(f'Cluster {label}' for label in cluster_labels)
+        subplot_titles=tuple(cluster_label_to_string(label) for label in cluster_labels)
     )
 
     tab3_clusters_fig_row = 1
@@ -765,7 +772,7 @@ with tab3:
                         x=[i for i in range(len(time_series))],
                         y=time_series,
                         line={'color': st.session_state.y_true_colors[cluster_label]},
-                        name=f'Cluster {cluster_label}'
+                        name=cluster_label_to_string(cluster_label)
                     ),
                     row=tab3_clusters_fig_row,
                     col=tab3_clusters_fig_col,
