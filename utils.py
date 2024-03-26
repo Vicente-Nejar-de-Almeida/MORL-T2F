@@ -1,5 +1,6 @@
 import os
 import pickle
+import re
 
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from jqmcvi.base import dunn_fast
@@ -108,7 +109,9 @@ def open_dataset(dataset):
          df_all_feats = pickle.load(pickle_file)
     df_all_feats = cleaning(df_all_feats)
 
-    y_true = [int(y) for y in y_true]
+    labels_contain_letters = any([bool(re.search('[a-zA-Z]', l)) for l in y_true])
+    if not labels_contain_letters:
+        y_true = [int(y) for y in y_true]
 
     return ts_list, y_true, df_all_feats, model
 
