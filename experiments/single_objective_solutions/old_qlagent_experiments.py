@@ -182,7 +182,7 @@ if __name__ == '__main__':
                     features = []
                     while not done:
                         action_masks = get_action_masks(env)
-                        action = agent.act(action_masks=action_masks)
+                        action = agent.act(action_masks=action_masks, episode=episode)
                         # print('Action:', action)
                         next_obs, reward, done, info = env.step(action)
                         features_selected = info['features_selected']

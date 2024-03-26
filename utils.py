@@ -11,6 +11,7 @@ from t2f.selection.selection import cleaning
 from normalization import ZScoreNormalization
 from rl.agents.knn_td_agent import KNNTDAgent
 from rl.agents.true_online_sarsa.true_online_sarsa import TrueOnlineSarsaLambda
+from rl.agents.ql_agent import QLAgent
 
 
 
@@ -39,6 +40,14 @@ rl_agents = {
             'lamb': ('λ', 0.0, 1.0, 0.9),
             'alpha': ('α', 0.0, 1.0, 0.001),
             'fourier_order': ('fourier order', 1, 12, 3),
+            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0),
+            'min_epsilon': ('final ε', 0.0, 1.0, 0.05),
+            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20),
+        }
+    },
+    'Q-learning': {
+        'parameters': {
+            'alpha': ('α', 0.0, 1.0, 0.001),
             'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0),
             'min_epsilon': ('final ε', 0.0, 1.0, 0.05),
             'decay_episodes': ('number of episodes for ε decay', 1, 50, 20),
@@ -120,6 +129,14 @@ def get_agent(selected_agent, parameters, env, obs):
             gamma=1.0,
             **parameters
         )
+    elif selected_agent == 'Q-learning':
+        agent = QLAgent(
+            starting_state=tuple(obs),
+            state_space=env.observation_space,
+            action_space=env.action_space,
+            gamma=1.0,
+            **parameters
+        )
     return agent
 
 
@@ -128,6 +145,8 @@ def get_action(agent, obs, action_masks, episode):
         action = agent.act(action_masks=action_masks, episode=episode)
     elif isinstance(agent, TrueOnlineSarsaLambda):
         action = agent.act(obs=tuple(obs), action_masks=action_masks, episode=episode)
+    elif isinstance(agent, QLAgent):
+        action = agent.act(action_masks=action_masks, episode=episode)
     return action
 
 
@@ -142,4 +161,10 @@ def learn(agent, state, action, reward, next_state, done, action_masks):
             next_state=tuple(next_state),
             done=done,
             action_masks=action_masks
+        )
+    elif isinstance(agent, QLAgent):
+        agent.learn(
+            next_state=tuple(next_state),
+            reward=reward,
+            done=done,
         )
