@@ -133,6 +133,8 @@ with st.sidebar:
         on_change=reset_tabs,
     )
 
+    episodes_for_training = st.slider('Number of episodes to train the RL agent', 1, 100, 30)
+
     with st.expander('RL Hyperparameters', expanded=False):
         parameters = {}
         for parameter, details in rl_agents[selected_agent]['parameters'].items():
@@ -140,12 +142,14 @@ with st.sidebar:
             parameter_min_value = details[1]
             parameter_max_value = details[2]
             parameter_default_value = details[3]
+            parameter_information = details[4]
             if parameter != 'alpha':
                 parameters[parameter] = st.slider(
                     parameter_label,
                     parameter_min_value,
                     parameter_max_value,
-                    parameter_default_value
+                    parameter_default_value,
+                    help=parameter_information
                 )
             else:
                 parameters[parameter] = st.number_input(
@@ -154,7 +158,8 @@ with st.sidebar:
                     step=0.00001,
                     max_value=parameter_max_value,
                     value=parameter_default_value,
-                    format='%f'
+                    format='%f',
+                    help=parameter_information
                 )
     
     with st.expander('Early Stopping', expanded=False):
@@ -263,12 +268,25 @@ with tab1:
             new_episode_tab1()
         while not st.session_state.tab1_done:
             run_step_tab1()
+    
+
+    def train_agent_tab1():
+        if not st.session_state.tab1_running:
+            start_tab1()
+        if st.session_state.tab1_done:
+            new_episode_tab1()
+        for i in range(episodes_for_training):
+            while not st.session_state.tab1_done:
+                run_step_tab1()
+            if i < episodes_for_training - 1:
+                new_episode_tab1()
 
 
-    tab1_col1, tab1_col2, tab1_col3 = st.columns(3)
+    tab1_col1, tab1_col2, tab1_col3, tab1_col4 = st.columns(4)
     tab1_col1.button('Reset', type='primary', on_click=reset_tab1, disabled=(not st.session_state.tab1_running))
-    tab1_col2.button('Run episode', on_click=run_episode_tab1)
-    tab1_col3.button('Run step', on_click=run_step_tab1)
+    tab1_col2.button('Train agent', on_click=train_agent_tab1)
+    tab1_col3.button('Run episode', on_click=run_episode_tab1)
+    tab1_col4.button('Run step', on_click=run_step_tab1)
 
     st.subheader(f'Episode {st.session_state.tab1_episode}, Step {st.session_state.tab1_step}')
 
@@ -556,12 +574,25 @@ with tab2:
             new_episode_tab2()
         while not st.session_state.tab2_done:
             run_step_tab2()
+    
+
+    def train_agent_tab2():
+        if not st.session_state.tab2_running:
+            start_tab2()
+        if st.session_state.tab2_done:
+            new_episode_tab2()
+        for i in range(episodes_for_training):
+            while not st.session_state.tab2_done:
+                run_step_tab2()
+            if i < episodes_for_training - 1:
+                new_episode_tab2()
 
 
-    tab2_col1, tab2_col2, tab2_col3 = st.columns(3)
+    tab2_col1, tab2_col2, tab2_col3, tab2_col4 = st.columns(4)
     tab2_col1.button('Reset', type='primary', on_click=reset_tab2, key='Reset 2', disabled=(not st.session_state.tab2_running))
-    tab2_col2.button('Run episode', on_click=run_episode_tab2, key='Run episode 2')
-    tab2_col3.button('Run step', on_click=run_step_tab2, key='Run step 2')
+    tab2_col2.button('Train agent', on_click=train_agent_tab2, key='Train agent 2')
+    tab2_col3.button('Run episode', on_click=run_episode_tab2, key='Run episode 2')
+    tab2_col4.button('Run step', on_click=run_step_tab2, key='Run step 2')
 
     st.subheader(f'Episode {st.session_state.tab2_episode}, Step {st.session_state.tab2_step}')
 

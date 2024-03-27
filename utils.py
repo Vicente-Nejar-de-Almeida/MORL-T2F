@@ -29,29 +29,29 @@ for dataset_file in os.listdir(data_path):
 rl_agents = {
     'kNN TD': {
         'parameters': {
-            'k': ('k', 1, 12, 3),
-            'alpha': ('α', 0.0, 1.0, 0.0001),
-            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0),
-            'min_epsilon': ('final ε', 0.0, 1.0, 0.05),
-            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20),
+            'k': ('k', 1, 12, 3, 'Number of nearest neighbors for Q-value estimation'),
+            'alpha': ('α', 0.0, 1.0, 0.0001, 'Learning rate of the agent'),
+            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0, 'Initial probability of selecting random action'),
+            'min_epsilon': ('final ε', 0.0, 1.0, 0.05, 'Final probability of selecting random action'),
+            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20, 'Decay rate for probability of selecting random action'),
         }
     },
     'True Online Sarsa(λ)': {
         'parameters': {
-            'lamb': ('λ', 0.0, 1.0, 0.9),
-            'alpha': ('α', 0.0, 1.0, 0.001),
-            'fourier_order': ('fourier order', 1, 12, 3),
-            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0),
-            'min_epsilon': ('final ε', 0.0, 1.0, 0.05),
-            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20),
+            'lamb': ('λ', 0.0, 1.0, 0.9, 'Decay rate for eligibility traces'),
+            'alpha': ('α', 0.0, 1.0, 0.001, 'Learning rate of the agent'),
+            'fourier_order': ('fourier order', 1, 12, 3, 'Order of the Fourier approximation'),
+            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0, 'Initial probability of selecting random action'),
+            'min_epsilon': ('final ε', 0.0, 1.0, 0.05, 'Final probability of selecting random action'),
+            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20, 'Decay rate for probability of selecting random action'),
         }
     },
     'Q-learning': {
         'parameters': {
-            'alpha': ('α', 0.0, 1.0, 0.001),
-            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0),
-            'min_epsilon': ('final ε', 0.0, 1.0, 0.05),
-            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20),
+            'alpha': ('α', 0.0, 1.0, 0.001, 'Learning rate of the agent'),
+            'initial_epsilon': ('initial ε', 0.0, 1.0, 1.0, 'Initial probability of selecting random action'),
+            'min_epsilon': ('final ε', 0.0, 1.0, 0.05, 'Final probability of selecting random action'),
+            'decay_episodes': ('number of episodes for ε decay', 1, 50, 20, 'Decay rate for probability of selecting random action'),
         }
     }
 }
