@@ -57,7 +57,7 @@ def reset_local_info_tab2():
     if ('fixed_features' in st.session_state) and len(st.session_state.fixed_features) > 0:
         dummy_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=50,
+            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -213,7 +213,7 @@ with tab1:
         st.session_state.tab1_running = True
         st.session_state.tab1_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=50,
+            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -493,7 +493,7 @@ with tab2:
         if ('fixed_features' in st.session_state) and len(st.session_state.fixed_features) > 0:
             dummy_env = FeatureSelectionEnv(
                 df_features=st.session_state.df_all_feats,
-                n_features=50,
+                n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
                 clustering_model=st.session_state.model,
                 normalized_scorers=normalized_scorers,
                 early_stopping=PlateauEarlyStopping(
@@ -518,7 +518,7 @@ with tab2:
         st.session_state.tab2_running = True
         st.session_state.tab2_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=50,
+            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -590,9 +590,9 @@ with tab2:
 
     tab2_col1, tab2_col2, tab2_col3, tab2_col4 = st.columns(4)
     tab2_col1.button('Reset', type='primary', on_click=reset_tab2, key='Reset 2', disabled=(not st.session_state.tab2_running))
-    tab2_col2.button('Train agent', on_click=train_agent_tab2, key='Train agent 2')
-    tab2_col3.button('Run episode', on_click=run_episode_tab2, key='Run episode 2')
-    tab2_col4.button('Run step', on_click=run_step_tab2, key='Run step 2')
+    tab2_col2.button('Train agent', on_click=train_agent_tab2, key='Train agent 2', disabled=(len(st.session_state.fixed_features) == len(st.session_state.df_all_feats.columns)))
+    tab2_col3.button('Run episode', on_click=run_episode_tab2, key='Run episode 2', disabled=(len(st.session_state.fixed_features) == len(st.session_state.df_all_feats.columns)))
+    tab2_col4.button('Run step', on_click=run_step_tab2, key='Run step 2', disabled=(len(st.session_state.fixed_features) == len(st.session_state.df_all_feats.columns)))
 
     st.subheader(f'Episode {st.session_state.tab2_episode}, Step {st.session_state.tab2_step}')
 
