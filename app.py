@@ -103,7 +103,7 @@ def reset_tabs():
 
 
 st.set_page_config(
-    page_title='Time2ReinforcedFeat',
+    page_title='RL-T2F | Reinforcement Learning-Based Feature Selection for Multivariate Time Series Clustering',
     page_icon='📈',
 )
 
