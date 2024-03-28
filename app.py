@@ -691,7 +691,8 @@ with tab2:
             st.markdown('**Feature names**')
             def color_fixed_features(x):
                 if x in st.session_state.fixed_features:
-                    return f"background: #ff2b2b; color: white;"  
+                    # return f"background: #ff2b2b; color: white;" 
+                    return f'background: #FFA07A'
                 return ''
             st.table(pd.DataFrame({'Feature': st.session_state.tab2_local_features}).style.applymap(color_fixed_features))
             features_df = st.session_state.df_all_feats[st.session_state.tab2_local_features]

@@ -1,1 +1,1 @@
-# RL-T2F: Reinforcement Learning Based Feature Selection for Multivariate Time Series Clustering
+# RL-T2F: Reinforcement Learning-Based Feature Selection for Multivariate Time Series Clustering
