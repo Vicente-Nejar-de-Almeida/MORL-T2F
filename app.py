@@ -96,6 +96,7 @@ def reset_tab2():
 
 
 def reset_tabs():
+    st.session_state.fixed_features = []
     reset_tab1()
     reset_tab2()
 
@@ -185,7 +186,8 @@ with st.sidebar:
         )
     
 
-st.title('Time2ReinforcedFeat')
+st.markdown('# RL-T2F')
+st.markdown('#### Reinforcement Learning-Based Feature Selection for Multivariate Time Series Clustering')
 
 
 def display_metric(local_metrics):
@@ -194,7 +196,7 @@ def display_metric(local_metrics):
         else:
             metric = np.nan
         
-        if math.isnan(metric):
+        if metric is None or math.isnan(metric):
             return '-'
         else:
             return round(metric, 4)
@@ -687,7 +689,11 @@ with tab2:
     with st.expander('Selected Features', expanded=False):
         if len(st.session_state.tab2_local_features) > 0:
             st.markdown('**Feature names**')
-            st.table(pd.DataFrame({'Feature': st.session_state.tab2_local_features}))
+            def color_fixed_features(x):
+                if x in st.session_state.fixed_features:
+                    return f"background: #ff2b2b; color: white;"  
+                return ''
+            st.table(pd.DataFrame({'Feature': st.session_state.tab2_local_features}).style.applymap(color_fixed_features))
             features_df = st.session_state.df_all_feats[st.session_state.tab2_local_features]
             st.markdown('**Feature values**')
             st.dataframe(features_df)
