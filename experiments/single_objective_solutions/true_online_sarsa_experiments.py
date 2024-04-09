@@ -6,7 +6,7 @@ import pandas as pd
 
 import sys
 sys.path.append("../..")
-
+import csv
 from t2f.extraction.extractor import feature_extraction
 from t2f.model.clustering import ClusterWrapper
 from t2f.data.dataset import read_ucr_datasets
@@ -114,7 +114,12 @@ if __name__ == '__main__':
                 n_features = len(df_all_feats.columns) - 1
 
         results = None
-        
+        file = open(f"results/true_online_sarsa_final_episodes_results_{nameDataset}.csv", mode='a', newline='')
+        writer = csv.writer(file)
+        writer.writerow(['alpha','lambda','fourier_order','run','episode','rewards','features','y_pred','scores','AMI','time',
+                         'silhouette','calinski_harabasz','davies_bouldin','dunn_index','silhouette_norm','calinski_harabasz_norm',
+                         'davies_bouldin_norm','dunn_index_norm'])
+        file.close()
         for alpha in [0.001, 0.00001, 0.000001]:
             print(f'alpha: {alpha}')
             for lamb in [0.1, 0.45, 0.9]:
@@ -147,8 +152,7 @@ if __name__ == '__main__':
                                 fourier_order=fourier_order,
                                 initial_epsilon=1.0,
                                 min_epsilon=0.05,
-                                decay_episodes=20
-                            )
+                                decay_episodes=20)
 
                             y_pred = y_true
 
@@ -180,7 +184,7 @@ if __name__ == '__main__':
 
                                 y_pred = model.fit_predict(df_all_feats[features_selected])
                                 AMI = adjusted_mutual_info_score(y_pred, y_true)
-                                    
+
                                 new_results = pd.DataFrame({
                                     'alpha': alpha,
                                     'lambda': lamb,
@@ -196,16 +200,22 @@ if __name__ == '__main__':
                                     **env.real_scores,
                                     **env.normalized_scores,
                                 })
-                                '''if results is None:
-                                    results = new_results.copy()
-                                else:
-                                    results = pd.concat([results, new_results])'''
-
                                 # Append the DataFrame to the CSV file
                                 new_results.to_csv(f"results/true_online_sarsa_results_{nameDataset}.csv", mode='a', index=False)
                                 new_results.to_json(f"results/true_online_sarsa_results_{nameDataset}.json", orient='records')
                                 # print(env.current_state)
                                 obs = env.reset()
                                 done = False
+                        # Open the existing file in append mode
+                        ciao = new_results.iloc[-1]['y_pred'].replace("\n", "").replace("[", "").replace("]","").split()
+                        lastVal = new_results.iloc[-1]
+                        list_of_integers = [int(x) for x in ciao]
+                        lastVal['y_pred'] = list_of_integers
+                        # new_results.iloc[-1]['y_pred'] = list_of_integers
 
+                        file = open(f"results/true_online_sarsa_final_episodes_results_{nameDataset}.csv", mode='a', newline='')
+                        writer = csv.writer(file)
+                        writer.writerow(list(lastVal))
+                        file.close()
+                        # new_results.iloc[-1].to_csv(f"results/true_online_sarsa_final_episodes_results_{nameDataset}.csv", mode='a', index=False)
         results.to_csv(f'results/true_online_sarsa_results_{nameDataset}.csv', index=False)
