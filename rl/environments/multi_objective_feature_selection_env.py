@@ -14,10 +14,10 @@ def get_vector_score(df_feat_all, y_pred):
     scores = np.array([dbs, chs, dunn, sils])
     return scores
 
-def obtain_score(df_feat_all, y_pred, list_eval):
+def obtain_score(df_feat_all, y_pred, list_eval, selected_features):
     scoreTotal = []
     for norm_score in list_eval:
-        scoreTotal.append(norm_score.get_normalized_value(df_feat_all, y_pred)[1])
+        scoreTotal.append(norm_score.normalize(df_feat_all, y_pred)[1])
     if math.inf in scoreTotal or -math.inf in scoreTotal:
         raise ValueError
     else:
@@ -44,17 +44,24 @@ class MOFeatureSelectionEnv(gym.Env):
     
     def _get_obs(self) -> np.array:
         return self.current_state
+    
+    def _get_features_selected(self):
+        # return [feature for i, feature in enumerate(self.all_features.columns) if self.current_state[i]]
+        return self.features_selected
 
     def _get_info(self) -> dict:
         return {
             'legal_actions': [action for action in range(self.action_space.n) if not self.current_state[action]],
             'y_pred': self.y_pred,
+            'features_selected': self._get_features_selected(),
         }
     
     def reset(self, seed=None, options=None):
+        self.features_selected = []
         self.current_state = np.zeros(len(self.all_features.columns))
         self.list_eval = self.list_eval_reset
         self.previous_vector_score = np.array([0 for x in range(len(self.list_eval))])
+        self.scores_received = []
         observation = self._get_obs()
         self.steps_taken = 0
         info = self._get_info()
@@ -65,16 +72,23 @@ class MOFeatureSelectionEnv(gym.Env):
         y_pred = self.clustering_model.fit_predict(self.all_features[selected_features])
         self.y_pred = y_pred
         try:
-            vector_score = obtain_score(self.all_features, y_pred, self.list_eval)
+            vector_score = obtain_score(self.all_features, y_pred, self.list_eval, selected_features)
+            self.scores_received.append(vector_score)
             # vector_score = get_vector_score(self.all_features, y_pred)
             gain = vector_score - self.previous_vector_score
             self.previous_vector_score = vector_score
             return gain
         except:
+            self.scores_received.append(np.nan)
             return self.previous_vector_score
     
     def step(self, action):
         self.current_state[action] = 1
+        self.features_selected.append(self.all_features.columns[action])
+
+        # Refactor later
+        self.features_selected = list(set(self.features_selected))
+
         reward = self._get_reward()
         observation = self._get_obs()
         info = self._get_info()
