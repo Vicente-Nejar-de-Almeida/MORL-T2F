@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+import torch
+
 import sys
 sys.path.append("../..")
 
@@ -26,13 +28,14 @@ import gymnasium as gym
 import mo_gymnasium as mo_gym
 
 from mo_gymnasium.utils import MORecordEpisodeStatistics
-from morl_baselines.multi_policy.gpi_pd.gpi_pd import GPILS
+from morl_baselines.multi_policy.gpi_pd.gpi_pd import GPILS, GPIPD
 
 from rl.environments.multi_objective_feature_selection_env import MOFeatureSelectionEnv
 
 GAMMA = 0.98
 
-dataset_names = ['BasicMotions', 'Libras', 'ERing', 'RacketSports']
+# dataset_names = ['BasicMotions', 'Libras', 'ERing', 'RacketSports']
+dataset_names = ['BasicMotions']
 transform_type = 'minmax'
 model_type = 'Hierarchical'
 train_size = 0.3
@@ -141,23 +144,53 @@ for nameDataset in dataset_names:
                 list_eval=normalized_scorers
             )
 
-            obs = env.reset()
+            obs, info = env.reset()
             done = False
+            
+            gpi_pd = True
 
-            agent = GPILS(
+            agent = GPIPD(
                 env,
-                per=True,
+                num_nets=2,
+                max_grad_norm=None,
+                learning_rate=3e-4,
+                gamma=0.98,
+                batch_size=128,
+                net_arch=[256, 256, 256, 256],
+                buffer_size=int(2e5),
                 initial_epsilon=1.0,
                 final_epsilon=0.05,
-                epsilon_decay_steps=2000,
+                epsilon_decay_steps=5000,
+                learning_starts=100,
+                alpha_per=0.6,
+                min_priority=0.01,
+                per=gpi_pd,
+                gpi_pd=gpi_pd,
+                use_gpi=True,
                 target_net_update_freq=200,
-                gradient_updates=10,
-                log=False
+                tau=1,
+                dyna=gpi_pd,
+                dynamics_uncertainty_threshold=1.5,
+                dynamics_net_arch=[256, 256, 256, 256],
+                dynamics_buffer_size=int(1e5),
+                dynamics_rollout_batch_size=25000,
+                dynamics_train_freq=lambda t: 250,
+                dynamics_rollout_freq=250,
+                dynamics_rollout_starts=5000,
+                dynamics_rollout_len=1,
+                real_ratio=0.5,
+                log=False,
+                project_name="MORL-Baselines",
+                experiment_name="GPI-PD",
             )
 
-            agent.train(total_timesteps=100000,
-                        eval_env=env,
-                        ref_point=np.array([-1,-1,-200])
+            timesteps_per_iter = 10000
+
+            agent.train(
+                total_timesteps=10 * timesteps_per_iter,
+                eval_env=env,
+                ref_point=np.array([1, 1, 1, 1]),
+                timesteps_per_iter=timesteps_per_iter,
             )
 
             y_pred = y_true
@@ -166,27 +199,27 @@ for nameDataset in dataset_names:
             ami_results = None
             AMI_values = []
 
-            obs = env.reset()
+            obs, info = env.reset()
 
             # for episode in tqdm(range(episodes)):
             for w in [
-                [0.25, 0.25, 0.25, 0.25],
-                [0.52, 0.16, 0.16, 0.16],
-                [0.16, 0.52, 0.16, 0.16],
-                [0.16, 0.16, 0.52, 0.16],
-                [0.16, 0.16, 0.16, 0.52],
-                [0.4, 0.4, 0.1, 0.1],
-                [0.4, 0.1, 0.4, 0.1],
-                [0.4, 0.1, 0.1, 0.4],
-                [0.1, 0.4, 0.4, 0.1],
-                [0.1, 0.4, 0.1, 0.4],
-                [0.1, 0.1, 0.4, 0.4],
+                torch.tensor(np.array([0.25, 0.25, 0.25, 0.25]), dtype=torch.float32),
+                torch.tensor(np.array([0.52, 0.16, 0.16, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.52, 0.16, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.16, 0.52, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.16, 0.16, 0.52]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.4, 0.1, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.1, 0.4, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.1, 0.1, 0.4]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.4, 0.4, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.4, 0.1, 0.4]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.1, 0.4, 0.4]), dtype=torch.float32),
             ]:
                 # print(f'Episode: {episode}')
                 rewards = []
                 features = []
                 while not done:
-                    action = agent._act(obs=obs, w=w)
+                    action = agent._act(obs=torch.tensor(obs, dtype=torch.float32), w=w)
                     # print('Action:', action)
                     obs, reward, done, _, info = env.step(action)
                     features_selected = info['features_selected']
@@ -226,7 +259,7 @@ for nameDataset in dataset_names:
 
 
                 # print(env.current_state)
-                obs = env.reset()
+                obs, info = env.reset()
                 done = False
             results.to_csv(f'results/morl_gpils_stepwise_results_{nameDataset}.csv', index=False)
             ami_results.to_csv(f'results/morl_gpils_ami_results_{nameDataset}.csv', index=False)

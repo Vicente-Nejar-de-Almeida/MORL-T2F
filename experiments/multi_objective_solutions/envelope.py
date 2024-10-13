@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+import torch
+
 import sys
 sys.path.append("../..")
 
@@ -142,7 +144,7 @@ for nameDataset in dataset_names:
                 list_eval=normalized_scorers
             )
 
-            obs = env.reset()
+            obs, info = env.reset()
             done = False
 
             agent = Envelope(
@@ -188,27 +190,27 @@ for nameDataset in dataset_names:
             ami_results = None
             AMI_values = []
 
-            obs = env.reset()
+            obs, info = env.reset()
 
             # for episode in tqdm(range(episodes)):
             for w in [
-                [0.25, 0.25, 0.25, 0.25],
-                [0.52, 0.16, 0.16, 0.16],
-                [0.16, 0.52, 0.16, 0.16],
-                [0.16, 0.16, 0.52, 0.16],
-                [0.16, 0.16, 0.16, 0.52],
-                [0.4, 0.4, 0.1, 0.1],
-                [0.4, 0.1, 0.4, 0.1],
-                [0.4, 0.1, 0.1, 0.4],
-                [0.1, 0.4, 0.4, 0.1],
-                [0.1, 0.4, 0.1, 0.4],
-                [0.1, 0.1, 0.4, 0.4],
+                torch.tensor(np.array([0.25, 0.25, 0.25, 0.25]), dtype=torch.float32),
+                torch.tensor(np.array([0.52, 0.16, 0.16, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.52, 0.16, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.16, 0.52, 0.16]), dtype=torch.float32),
+                torch.tensor(np.array([0.16, 0.16, 0.16, 0.52]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.4, 0.1, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.1, 0.4, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.4, 0.1, 0.1, 0.4]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.4, 0.4, 0.1]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.4, 0.1, 0.4]), dtype=torch.float32),
+                torch.tensor(np.array([0.1, 0.1, 0.4, 0.4]), dtype=torch.float32),
             ]:
                 # print(f'Episode: {episode}')
                 rewards = []
                 features = []
                 while not done:
-                    action = agent.act(obs=obs, w=w)
+                    action = agent.act(obs=torch.tensor(obs, dtype=torch.float32), w=w)
                     # print('Action:', action)
                     obs, reward, done, _, info = env.step(action)
                     features_selected = info['features_selected']
@@ -244,7 +246,7 @@ for nameDataset in dataset_names:
 
 
                 # print(env.current_state)
-                obs = env.reset()
+                obs, info = env.reset()
                 done = False
             results.to_csv(f'results/morl_envelope_stepwise_results_{nameDataset}.csv', index=False)
             ami_results.to_csv(f'results/morl_envelope_ami_results_{nameDataset}.csv', index=False)
