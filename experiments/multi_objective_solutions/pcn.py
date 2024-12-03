@@ -175,22 +175,22 @@ for nameDataset in dataset_names:
                 list_feat.append(len(features_selected))
                 list_time.append(time.time() - start_time_ep)
 
-                best_index = np.argmax(list_AMI)
-                new_ami_results = pd.DataFrame({
-                    'episode': [episodes],
-                    'feat_max': [original_features],
-                    'features_average': [np.average(list_feat)],
-                    'AMI_average': [np.average(list_AMI)],
-                    'features_std': [np.std(list_feat)],
-                    'AMI_std': [np.std(list_AMI)],
-                    'best_AMI': [list_AMI[best_index]],
-                    'best_feat': [list_feat[best_index]],
-                    'time_average': [np.average(list_time)]
-                })
-                if ami_results is None:
-                    ami_results = new_ami_results.copy()
-                else:
-                    ami_results = pd.concat([ami_results, new_ami_results])
+            best_index = np.argmax(list_AMI)
+            new_ami_results = pd.DataFrame({
+                'episode': [episodes],
+                'feat_max': [original_features],
+                'features_average': [np.average(list_feat)],
+                'AMI_average': [np.average(list_AMI)],
+                'features_std': [np.std(list_feat)],
+                'AMI_std': [np.std(list_AMI)],
+                'best_AMI': [list_AMI[best_index]],
+                'best_feat': [list_feat[best_index]],
+                'time_average': [np.average(list_time)]
+            })
+            if ami_results is None:
+                ami_results = new_ami_results.copy()
+            else:
+                ami_results = pd.concat([ami_results, new_ami_results])
 
     if not os.path.exists(f'results/{nameDataset}'):
         os.mkdir(f'results/{nameDataset}')
