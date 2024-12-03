@@ -99,18 +99,16 @@ for nameDataset in dataset_names:
     ]
 
 
-    total_number_of_features = [25]
-    episodes_total = [5,10]
+    total_number_of_features = [25, 50]
+    episodes_total = [25,50, 75]
     ami_results = None
     for episodes in episodes_total:
-        print('Total number of features:', total_number_of_features)
-
         for n_features in total_number_of_features:
+            print(f'Analyzing {episodes} episodes with {n_features} features')
+            original_features = n_features
             if n_features > len(df_all_feats.columns):
-                original_features = n_features
                 n_features = len(df_all_feats.columns) - 1
-            else:
-                original_features = n_features
+
 
             env = mo_gym.make(
                 "mo-feature-selection-env-v0",
