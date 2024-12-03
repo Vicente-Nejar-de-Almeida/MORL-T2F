@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+import torch
+
 import sys
 sys.path.append("../..")
 
@@ -27,6 +29,8 @@ import mo_gymnasium as mo_gym
 
 from mo_gymnasium.utils import MORecordEpisodeStatistics
 from morl_baselines.multi_policy.gpi_pd.gpi_pd import GPILS
+from morl_baselines.multi_policy.envelope.envelope import Envelope
+from morl_baselines.multi_policy.pcn.pcn import PCN
 
 from rl.environments.multi_objective_feature_selection_env import MOFeatureSelectionEnv
 
@@ -47,6 +51,7 @@ for nameDataset in dataset_names:
 
     # Create cluster model
     model = ClusterWrapper(n_clusters=n_clusters, model_type=model_type, transform_type=transform_type)
+    print(nameDataset)
     print('Dataset shape: {}, Num of clusters: {}'.format(ts_list.shape, n_clusters))
 
     # This side is dedicated for the Semi-Supervised
@@ -141,23 +146,28 @@ for nameDataset in dataset_names:
                 list_eval=normalized_scorers
             )
 
-            obs = env.reset()
+            obs, info = env.reset()
             done = False
 
-            agent = GPILS(
+            agent = PCN(
                 env,
-                per=True,
-                initial_epsilon=1.0,
-                final_epsilon=0.05,
-                epsilon_decay_steps=2000,
-                target_net_update_freq=200,
-                gradient_updates=10,
-                log=False
+                scaling_factor=np.array([1, 1, 1, 1, 1]),
+                learning_rate=1e-3,
+                batch_size=256,
+                project_name="MORL-Baselines",
+                experiment_name="PCN",
+                log=False,
             )
 
-            agent.train(total_timesteps=100000,
-                        eval_env=env,
-                        ref_point=np.array([-1,-1,-200])
+            agent.train(
+                total_timesteps=20000,
+                eval_env=env,
+                ref_point=np.array([0, 0, 0, 0]),
+                num_er_episodes=20,
+                max_buffer_size=50,
+                num_model_updates=50,
+                # max_return=np.array([10, 10, 10, 10]),
+                # known_pareto_front=env.unwrapped.pareto_front(gamma=1.0),
             )
 
             y_pred = y_true
@@ -166,40 +176,28 @@ for nameDataset in dataset_names:
             ami_results = None
             AMI_values = []
 
-            obs = env.reset()
+            obs, info = env.reset()
 
             # for episode in tqdm(range(episodes)):
-            for w in [
-                [0.25, 0.25, 0.25, 0.25],
-                [0.52, 0.16, 0.16, 0.16],
-                [0.16, 0.52, 0.16, 0.16],
-                [0.16, 0.16, 0.52, 0.16],
-                [0.16, 0.16, 0.16, 0.52],
-                [0.4, 0.4, 0.1, 0.1],
-                [0.4, 0.1, 0.4, 0.1],
-                [0.4, 0.1, 0.1, 0.4],
-                [0.1, 0.4, 0.4, 0.1],
-                [0.1, 0.4, 0.1, 0.4],
-                [0.1, 0.1, 0.4, 0.4],
-            ]:
+            for run in range(10):
                 # print(f'Episode: {episode}')
                 rewards = []
                 features = []
                 while not done:
-                    action = agent._act(obs=obs, w=w)
+                    action = agent._act(
+                        # obs=torch.tensor(obs, dtype=torch.float32),
+                        obs = np.array(obs, dtype=np.float32),
+                        desired_return=np.array([10, 10, 10, 10]),
+                        desired_horizon=30
+                    )
                     # print('Action:', action)
                     obs, reward, done, _, info = env.step(action)
                     features_selected = info['features_selected']
                     features.append(' | '.join(features_selected))
                     rewards.append(reward)
 
-                """
-                for detailed_scores in info['score_history']:
-                    for k, v in detailed_scores.items():
-                        results[episode][k].append(v)
-                """
                 new_results = pd.DataFrame({
-                    'w': [str(w) for _ in rewards],
+                    'run': [str(run) for _ in rewards],
                     'rewards': rewards,
                     'features': features,
                     'normalized_scores': env.scores_received,
@@ -210,32 +208,32 @@ for nameDataset in dataset_names:
                     results = new_results.copy()
                 else:
                     results = pd.concat([results, new_results])
-                
+
                 y_pred = model.fit_predict(df_all_feats[features_selected])
                 AMI = adjusted_mutual_info_score(y_pred, y_true)
                 AMI_values.append(AMI)
 
                 new_ami_results = pd.DataFrame({
-                    'w': str(w),
+                    'run': str(run),
                     'AMI': [AMI]
                 })
                 if ami_results is None:
                     ami_results = new_ami_results.copy()
                 else:
                     ami_results = pd.concat([ami_results, new_ami_results])
+                
 
 
                 # print(env.current_state)
-                obs = env.reset()
+                obs, info = env.reset()
                 done = False
-            results.to_csv(f'results/morl_gpils_stepwise_results_{nameDataset}.csv', index=False)
-            ami_results.to_csv(f'results/morl_gpils_ami_results_{nameDataset}.csv', index=False)
-            y_pred = model.fit_predict(df_all_feats[features_selected])
-            AMI = adjusted_mutual_info_score(y_pred, y_true)
+            results.to_csv(f'results/morl_pcn_stepwise_results_{nameDataset}.csv', index=False)
+            ami_results.to_csv(f'results/morl_pcn_ami_results_{nameDataset}.csv', index=False)
+            
             finTime = (time.time() - start_time) + extract_time
             # results = [nameDataset, n_features, AMI, finTime]
             # writer.writerow(results)
-            print(f"{nameDataset}, has obtained a value of AMI equal to {AMI} with {len(features_selected)} features with time {finTime}")
+            print(f"{nameDataset}, has obtained a value of AMI equal to {max(AMI_values)} with {len(features_selected)} features with time {finTime}")
             # print("The Dataset %s has obtained ")
             # print("AMI: ", AMIVal[len(AMIVal) - 1])
             print('**********************')
