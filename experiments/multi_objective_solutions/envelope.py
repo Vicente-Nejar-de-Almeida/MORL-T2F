@@ -20,8 +20,7 @@ warnings.filterwarnings("ignore")
 from sklearn.metrics import davies_bouldin_score, calinski_harabasz_score, silhouette_score
 from jqmcvi.base import dunn_fast
 
-from normalization import ZScoreNormalization, MinMaxNormalization
-
+from normalization import MinMaxNormalization
 import gymnasium as gym
 import mo_gymnasium as mo_gym
 
@@ -33,7 +32,7 @@ from rl.environments.multi_objective_feature_selection_env import MOFeatureSelec
 
 GAMMA = 0.98
 
-dataset_names = ['BasicMotions', 'Libras', 'ERing', 'RacketSports']
+dataset_names = ['BasicMotions']
 transform_type = 'minmax'
 model_type = 'Hierarchical'
 train_size = 0.3
@@ -50,15 +49,6 @@ for nameDataset in dataset_names:
     model = ClusterWrapper(n_clusters=n_clusters, model_type=model_type, transform_type=transform_type)
     print('Dataset shape: {}, Num of clusters: {}'.format(ts_list.shape, n_clusters))
 
-    # This side is dedicated for the Semi-Supervised
-    labels = {}
-    if train_size > 0:
-        # Extract a subset of labelled mts to train the semi-supervised model
-        idx_train, _, y_train, _ = train_test_split(
-            np.arange(len(ts_list)), y_true, train_size=train_size)
-        labels = {i: j for i, j in zip(idx_train, y_train)}
-        # print('Number of Labels: {}'.format(len(labels)))
-
     if not os.path.isfile("../../data/"+nameDataset+"_feats.pkl"):
         time_start = time.time()
         df_all_feats = feature_extraction(ts_list, batch_size, p)
@@ -70,70 +60,58 @@ for nameDataset in dataset_names:
         df_all_feats = pickle.load(pickle_file)
 
     df_all_feats = cleaning(df_all_feats)
-    # print(len(df_all_feats))
-    total_number_of_features = [25]
-    episodes_total = [100]
 
+    # Creation Metrics
+    silhouette_norm = MinMaxNormalization(
+        score_function=silhouette_score,
+        min_val=-1,
+        max_val=1,
+        name='silhouette',
+    )
+
+    calinski_norm = MinMaxNormalization(
+        score_function=calinski_harabasz_score,
+        min_val=0,
+        max_val=25,
+        name='calinski_harabasz',
+    )
+
+    davies_bouldin_norm = MinMaxNormalization(
+        score_function=davies_bouldin_score,
+        min_val=0,
+        max_val=12,
+        maximize=False,  # minimum score is zero, with lower values indicating better clustering
+        name='davies_bouldin',
+    )
+
+    dunn_index_norm = MinMaxNormalization(
+        score_function=dunn_fast,
+        min_val=0,
+        max_val=1,
+        name='dunn_index',
+    )
+
+    normalized_scorers = [
+        silhouette_norm,
+        calinski_norm,
+        davies_bouldin_norm,
+        dunn_index_norm
+    ]
+
+
+    total_number_of_features = [25]
+    episodes_total = [5,10]
+    ami_results = None
     for episodes in episodes_total:
         print('Total number of features:', total_number_of_features)
+
         for n_features in total_number_of_features:
             if n_features > len(df_all_feats.columns):
+                original_features = n_features
                 n_features = len(df_all_feats.columns) - 1
-            
-            start_time = time.time()
+            else:
+                original_features = n_features
 
-            #print('Before:')
-            #print(df_all_feats)
-            df_all_feats = df_all_feats[list(reversed(df_all_feats.columns))]
-            #print('After:')
-            #print(df_all_feats)
-
-            silhouette_norm = MinMaxNormalization(
-                score_function=silhouette_score,
-                min_val=-1,
-                max_val=1,
-                name='silhouette',
-            )
-
-            
-            calinski_norm = MinMaxNormalization(
-                score_function=calinski_harabasz_score,
-                min_val=0,
-                max_val=25,
-                name='calinski_harabasz',
-            )
-
-            davies_bouldin_norm = MinMaxNormalization(
-                score_function=davies_bouldin_score,
-                min_val=0,
-                max_val=12,
-                maximize=False,  # minimum score is zero, with lower values indicating better clustering
-                name='davies_bouldin',
-            )
-
-            dunn_index_norm = MinMaxNormalization(
-                score_function=dunn_fast,
-                min_val=0,
-                max_val=1,
-                name='dunn_index',
-            )
-            
-
-            normalized_scorers = [
-                silhouette_norm,
-                calinski_norm,
-                davies_bouldin_norm,
-                dunn_index_norm
-            ]
-
-            """
-            env = MOFeatureSelectionEnv(
-                df_features=df_all_feats,
-                n_features=n_features,
-                clustering_model=model,
-                list_eval=normalized_scorers,
-            )
-            """
             env = mo_gym.make(
                 "mo-feature-selection-env-v0",
                 df_features=df_all_feats,
@@ -170,7 +148,7 @@ for nameDataset in dataset_names:
             )
 
             agent.train(
-                total_timesteps=100000,
+                total_timesteps=100,
                 total_episodes=None,
                 weight=None,
                 eval_env=env,
@@ -182,15 +160,13 @@ for nameDataset in dataset_names:
                 reset_learning_starts=False,
             )
 
+            df_all_feats = df_all_feats[list(reversed(df_all_feats.columns))]
             y_pred = y_true
-
-            results = None
-            ami_results = None
-            AMI_values = []
-
+            list_AMI = []
+            list_feat = []
+            list_time = []
             obs = env.reset()
 
-            # for episode in tqdm(range(episodes)):
             for w in [
                 [0.25, 0.25, 0.25, 0.25],
                 [0.52, 0.16, 0.16, 0.16],
@@ -204,55 +180,45 @@ for nameDataset in dataset_names:
                 [0.1, 0.4, 0.1, 0.4],
                 [0.1, 0.1, 0.4, 0.4],
             ]:
-                # print(f'Episode: {episode}')
-                rewards = []
-                features = []
-                while not done:
-                    action = agent.act(obs=obs, w=w)
-                    # print('Action:', action)
-                    obs, reward, done, _, info = env.step(action)
-                    features_selected = info['features_selected']
-                    features.append(' | '.join(features_selected))
-                    rewards.append(reward)
+                for episode in tqdm(range(episodes)):
+                    start_time_ep = time.time()
+                    rewards = []
+                    features = []
+                    while not done:
+                        action = agent.act(obs=obs, w=w)
+                        # print('Action:', action)
+                        obs, reward, done, _, info = env.step(action)
+                        features_selected = info['features_selected']
+                        features.append(' | '.join(features_selected))
+                        rewards.append(reward)
 
-                new_results = pd.DataFrame({
-                    'w': [str(w) for _ in rewards],
-                    'rewards': rewards,
-                    'features': features,
-                    'normalized_scores': env.scores_received,
-                    #**env.real_scores,
-                    #**env.normalized_scores,
-                })
-                if results is None:
-                    results = new_results.copy()
-                else:
-                    results = pd.concat([results, new_results])
-
-                y_pred = model.fit_predict(df_all_feats[features_selected])
-                AMI = adjusted_mutual_info_score(y_pred, y_true)
-                AMI_values.append(AMI)
-
+                    y_pred = model.fit_predict(df_all_feats[features_selected])
+                    AMI = adjusted_mutual_info_score(y_pred, y_true)
+                    list_AMI.append(AMI)
+                    list_feat.append(len(features_selected))
+                    list_time.append(time.time() - start_time_ep)
+                    # print(env.current_state)
+                    obs = env.reset()
+                    done = False
+                best_index = np.argmax(list_AMI)
                 new_ami_results = pd.DataFrame({
-                    'w': str(w),
-                    'AMI': [AMI]
+                    'w': [str(w)],
+                    'episode': [episodes],
+                    'feat_max': [original_features],
+                    'features_average': [np.average(list_feat)],
+                    'AMI_average': [np.average(list_AMI)],
+                    'features_std': [np.std(list_feat)],
+                    'AMI_std': [np.std(list_AMI)],
+                    'best_AMI': [list_AMI[best_index]],
+                    'best_feat': [list_feat[best_index]],
+                    'time_average': [np.average(list_time)]
                 })
                 if ami_results is None:
                     ami_results = new_ami_results.copy()
                 else:
                     ami_results = pd.concat([ami_results, new_ami_results])
-                
 
 
-                # print(env.current_state)
-                obs = env.reset()
-                done = False
-            results.to_csv(f'results/morl_envelope_stepwise_results_{nameDataset}.csv', index=False)
-            ami_results.to_csv(f'results/morl_envelope_ami_results_{nameDataset}.csv', index=False)
-            
-            finTime = (time.time() - start_time) + extract_time
-            # results = [nameDataset, n_features, AMI, finTime]
-            # writer.writerow(results)
-            print(f"{nameDataset}, has obtained a value of AMI equal to {max(AMI_values)} with {len(features_selected)} features with time {finTime}")
-            # print("The Dataset %s has obtained ")
-            # print("AMI: ", AMIVal[len(AMIVal) - 1])
-            print('**********************')
+    if not os.path.exists(f'results/{nameDataset}'):
+        os.mkdir(f'results/{nameDataset}')
+    ami_results.to_csv(f'results/{nameDataset}/morl_envelope_ami_results_{nameDataset}.csv', index=False)
