@@ -31,68 +31,72 @@ from rl.agents.knn_td_agent import KNNTDAgent
 from tqdm import tqdm
 
 def run_experiment(params):
-    k, alpha, decay_episodes, df_all_feats, n_features, model, normalized_scorers, y_true, nameDataset, episodes_total = params
+    k, alpha, decay_episodes, df_all_feats, n_features,original_features, model, normalized_scorers, y_true, nameDataset, episodes_total = params
     results = None
-    for run in range(3):
-        for episodes in episodes_total:
-            start_time = time.time()
-            env = FeatureSelectionEnv(
-                df_features=df_all_feats,
-                n_features=n_features,
-                clustering_model=model,
-                normalized_scorers=normalized_scorers,
-                early_stopping=PlateauEarlyStopping(
-                    patience=20,
-                    plateau_patience=20,
-                    threshold=0.03
-                )
+    list_AMI = []
+    list_feat = []
+    list_time = []
+    for episodes in episodes_total:
+        env = FeatureSelectionEnv(
+            df_features=df_all_feats,
+            n_features=n_features,
+            clustering_model=model,
+            normalized_scorers=normalized_scorers,
+            early_stopping=PlateauEarlyStopping(
+                patience=20,
+                plateau_patience=20,
+                threshold=0.12
             )
+        )
+        obs = env.reset()
+        done = False
+        agent = KNNTDAgent(
+            starting_state=tuple(obs),
+            state_space=env.observation_space,
+            action_space=env.action_space,
+            k=k,
+            alpha=alpha,
+            gamma=1.0,
+            initial_epsilon=1.0,
+            min_epsilon=0.05,
+            decay_episodes=decay_episodes
+        )
+        for episode in tqdm(range(episodes)):
+            start_time_ep = time.time()
+            rewards = []
+            features = []
+            while not done:
+                action_masks = get_action_masks(env)
+                action = agent.act(action_masks=action_masks, episode=episode)
+                next_obs, reward, done, info = env.step(action)
+                features_selected = info['features_selected']
+                features.append(' | '.join(features_selected))
+                agent.learn(tuple(next_obs), reward, done)
+                rewards.append(reward)
+
+            y_pred = model.fit_predict(df_all_feats[features_selected])
+            AMI = adjusted_mutual_info_score(y_pred, y_true)
+            list_AMI.append(AMI)
+            list_feat.append(len(features_selected))
+            list_time.append(time.time() - start_time_ep)
             obs = env.reset()
             done = False
-            agent = KNNTDAgent(
-                starting_state=tuple(obs),
-                state_space=env.observation_space,
-                action_space=env.action_space,
-                k=k,
-                alpha=alpha,
-                gamma=1.0,
-                initial_epsilon=1.0,
-                min_epsilon=0.05,
-                decay_episodes=decay_episodes
-            )
-            y_pred = y_true
-            for episode in tqdm(range(episodes)):
-                rewards = []
-                features = []
-                while not done:
-                    action_masks = get_action_masks(env)
-                    action = agent.act(action_masks=action_masks, episode=episode)
-                    next_obs, reward, done, info = env.step(action)
-                    features_selected = info['features_selected']
-                    features.append(' | '.join(features_selected))
-                    agent.learn(tuple(next_obs), reward, done)
-                    rewards.append(reward)
-                finTime = (time.time() - start_time)
-                y_pred = model.fit_predict(df_all_feats[features_selected])
-                AMI = adjusted_mutual_info_score(y_pred, y_true)
-                new_results = pd.DataFrame({
-                    'k': k,
-                    'alpha': alpha,
-                    'decay_episodes': decay_episodes,
-                    'run': run,
-                    'episode': episode,
-                    'rewards': rewards,
-                    'features': features,
-                    'y_pred': str(y_pred),
-                    'scores': env.scores_received,
-                    'AMI': AMI,
-                    'time': finTime,
-                    **env.real_scores,
-                    **env.normalized_scores,
-                })
-                obs = env.reset()
-                done = False
-                new_results.to_csv(f'results/knn_results_{nameDataset}.csv', mode='a',index=False)
+        best_index = np.argmax(list_AMI)
+        new_results = pd.DataFrame({
+            'k': [k],
+            'alpha': [alpha],
+            'decay_episodes': [decay_episodes],
+            'episode': [episodes],
+            'feat_max': [original_features],
+            'features_average': [np.average(list_feat)],
+            'AMI_average': [np.average(list_AMI)],
+            'features_std': [np.std(list_feat)],
+            'AMI_std': [np.std(list_AMI)],
+            'best_AMI': [list_AMI[best_index]],
+            'best_feat': [list_feat[best_index]],
+            'time_average': [np.average(list_time)]
+        })
+        new_results.to_csv(f'results/{nameDataset}/knn_results_{nameDataset}.csv', mode='a',index=False,header=False)
 
 
 
@@ -103,7 +107,7 @@ if __name__ == '__main__':
     model_type = 'Hierarchical'
     train_size = 0.3
     batch_size = 500
-    p = os.cpu_count()
+    p = 1# os.cpu_count()
 
     silhouette_norm = ZScoreNormalization(score_function=silhouette_score, name='silhouette')
     calinski_norm = ZScoreNormalization(score_function=calinski_harabasz_score, name='calinski_harabasz')
@@ -118,16 +122,28 @@ if __name__ == '__main__':
         extract_time = 0
         ts_list, y_true = read_ucr_datasets(nameDataset=nameDataset)
         n_clusters = len(set(y_true))  # Get number of clusters to find
+        new_results = pd.DataFrame({
+            'k':['k'] ,
+            'alpha':['alpha'] ,
+            'decay_episodes':['decay_episodes'] ,
+            'episode':['episode'] ,
+            'feat_max':['feat_max'] ,
+            'features_average':['features_average'] ,
+            'AMI_average':['AMI_average'] ,
+            'features_std':['features_std'] ,
+            'AMI_std':['AMI_std'] ,
+            'best_AMI':['best_AMI'] ,
+            'best_feat':['best_feat'] ,
+            'time_average':['time_average'] ,
+        })
+        if not os.path.exists(f'results/{nameDataset}'):
+            os.mkdir(f'results/{nameDataset}')
+        new_results.to_csv(f'results/{nameDataset}/knn_results_{nameDataset}.csv', mode='a',index=False,header=False)
+
 
         # Create cluster model
         model = ClusterWrapper(n_clusters=n_clusters, model_type=model_type, transform_type=transform_type)
         print('Dataset shape: {}, Num of clusters: {}'.format(ts_list.shape, n_clusters))
-
-        labels = {}
-        if train_size > 0:
-            idx_train, _, y_train, _ = train_test_split(
-                np.arange(len(ts_list)), y_true, train_size=train_size)
-            labels = {i: j for i, j in zip(idx_train, y_train)}
 
         if not os.path.isfile("../../data/" + nameDataset + "_feats.pkl"):
             time_start = time.time()
@@ -142,11 +158,12 @@ if __name__ == '__main__':
         df_all_feats = cleaning(df_all_feats)
         print('Number of features:', len(df_all_feats.columns))
 
-        total_number_of_features = [50]
-        episodes_total = [50]
+        total_number_of_features = [20]
+        episodes_total = [5]
 
         print('Total number of features:', total_number_of_features)
         for n_features in total_number_of_features:
+            original_features = n_features
             if n_features > len(df_all_feats.columns):
                 n_features = len(df_all_feats.columns) - 1
 
@@ -154,7 +171,7 @@ if __name__ == '__main__':
         for k in [1, 3, 9]:
             for alpha in [0.1, 0.001, 0.0001]:
                 for decay_episodes in [10, 20, 30]:
-                    params_list.append((k, alpha, decay_episodes, df_all_feats, n_features, model, normalized_scorers,
+                    params_list.append((k, alpha, decay_episodes, df_all_feats, n_features,original_features, model, normalized_scorers,
                                         y_true, nameDataset, episodes_total))
 
         with Pool(processes=os.cpu_count()) as pool:

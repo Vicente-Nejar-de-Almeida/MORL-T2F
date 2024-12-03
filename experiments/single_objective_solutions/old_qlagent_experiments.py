@@ -40,31 +40,6 @@ if __name__ == '__main__':
     batch_size = 500
     p = os.cpu_count()
 
-    # silhouette_norm = ZScoreNormalization(silhouette_score, name='silhouette')
-    # calinski_norm = ZScoreNormalization(calinski_harabasz_score, name='calinski_harabasz')
-
-    """
-    silhouette_norm = ZScoreNormalization(
-        score_function=silhouette_score,
-        name='silhouette',
-    )
-    
-    calinski_norm = ZScoreNormalization(
-        score_function=calinski_harabasz_score,
-        name='calinski_harabasz',
-    )
-
-    davies_bouldin_norm = ZScoreNormalization(
-        score_function=davies_bouldin_score,
-        maximize=False,  # minimum score is zero, with lower values indicating better clustering
-        name='davies_bouldin',
-    )
-
-    dunn_index_norm = ZScoreNormalization(
-        score_function=dunn_fast,
-        name='dunn_index',
-    )
-    """
 
     silhouette_norm = MinMaxNormalization(
         score_function=silhouette_score,
@@ -98,10 +73,10 @@ if __name__ == '__main__':
     
 
     normalized_scorers = [
-        # silhouette_norm,
+        silhouette_norm,
         calinski_norm,
-        # davies_bouldin_norm,
-        # dunn_index_norm
+        davies_bouldin_norm,
+        dunn_index_norm
     ]
 
     for nameDataset in dataset_names:
@@ -113,14 +88,6 @@ if __name__ == '__main__':
         model = ClusterWrapper(n_clusters=n_clusters, model_type=model_type, transform_type=transform_type)
         print('Dataset shape: {}, Num of clusters: {}'.format(ts_list.shape, n_clusters))
 
-        # This side is dedicated for the Semi-Supervised
-        labels = {}
-        if train_size > 0:
-            # Extract a subset of labelled mts to train the semi-supervised model
-            idx_train, _, y_train, _ = train_test_split(
-                np.arange(len(ts_list)), y_true, train_size=train_size)
-            labels = {i: j for i, j in zip(idx_train, y_train)}
-            # print('Number of Labels: {}'.format(len(labels)))
 
         if not os.path.isfile("../../data/"+nameDataset+"_feats.pkl"):
             time_start = time.time()
@@ -133,7 +100,6 @@ if __name__ == '__main__':
             df_all_feats = pickle.load(pickle_file)
 
         df_all_feats = cleaning(df_all_feats)
-        print(len(df_all_feats))
         total_number_of_features = [25]
         episodes_total = [100]
 
