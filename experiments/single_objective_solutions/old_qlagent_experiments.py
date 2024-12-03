@@ -33,12 +33,12 @@ from tqdm import tqdm
 
 if __name__ == '__main__':
     # dataset_names = ["ERing", "RacketSports"]
-    dataset_names = ["ERing"]
+    dataset_names = ["BasicMotions"]
     transform_type = 'minmax'
     model_type = 'Hierarchical'
     train_size = 0.3
     batch_size = 500
-    p = os.cpu_count()
+    p = 1 # os.cpu_count()
 
 
     silhouette_norm = MinMaxNormalization(
@@ -100,22 +100,19 @@ if __name__ == '__main__':
             df_all_feats = pickle.load(pickle_file)
 
         df_all_feats = cleaning(df_all_feats)
-        total_number_of_features = [25]
-        episodes_total = [100]
-
+        total_number_of_features = [25, 50]
+        episodes_total = [25, 50, 75]
+        ami_results = None
         for episodes in episodes_total:
-            print('Total number of features:', total_number_of_features)
             for n_features in total_number_of_features:
+                print(f'Analyzing {episodes} episodes with {n_features} features')
+                original_features = n_features
                 if n_features > len(df_all_feats.columns):
                     n_features = len(df_all_feats.columns) - 1
-                
+
                 start_time = time.time()
 
-                print('Before:')
-                print(df_all_feats)
                 df_all_feats = df_all_feats[list(reversed(df_all_feats.columns))]
-                print('After:')
-                print(df_all_feats)
 
                 env = FeatureSelectionEnv(
                     df_features=df_all_feats,
@@ -141,9 +138,12 @@ if __name__ == '__main__':
                 y_pred = y_true
 
                 results = None
+                list_AMI = []
+                list_feat = []
+                list_time = []
 
                 for episode in tqdm(range(episodes)):
-                    # print(f'Episode: {episode}')
+                    start_time_ep = time.time()
                     rewards = []
                     features = []
                     while not done:
@@ -156,35 +156,31 @@ if __name__ == '__main__':
                         agent.learn(tuple(next_obs), reward, done)
                         rewards.append(reward)
 
-                    """
-                    for detailed_scores in info['score_history']:
-                        for k, v in detailed_scores.items():
-                            results[episode][k].append(v)
-                    """
-                    new_results = pd.DataFrame({
-                        'episode': episode,
-                        'rewards': rewards,
-                        'features': features,
-                        'scores': env.scores_received,
-                        **env.real_scores,
-                        **env.normalized_scores,
-                    })
-                    if results is None:
-                        results = new_results.copy()
-                    else:
-                        results = pd.concat([results, new_results])
-
-
-                    print(env.current_state)
+                    y_pred = model.fit_predict(df_all_feats[features_selected])
+                    AMI = adjusted_mutual_info_score(y_pred, y_true)
+                    list_AMI.append(AMI)
+                    list_feat.append(len(features_selected))
+                    list_time.append(time.time() - start_time_ep)
                     obs = env.reset()
                     done = False
-                # results.to_csv(f'results/calinksi_600episodes_test_results_{nameDataset}.csv', index=False)
-                y_pred = model.fit_predict(df_all_feats[features_selected])
-                AMI = adjusted_mutual_info_score(y_pred, y_true)
-                finTime = (time.time() - start_time) + extract_time
-                # results = [nameDataset, n_features, AMI, finTime]
-                # writer.writerow(results)
-                print(f"{nameDataset}, has obtained a value of AMI equal to {AMI} with {len(features_selected)} features with time {finTime}")
-                # print("The Dataset %s has obtained ")
-                # print("AMI: ", AMIVal[len(AMIVal) - 1])
-                print('**********************')
+
+                best_index = np.argmax(list_AMI)
+                new_ami_results = pd.DataFrame({
+                    'episode': [episodes],
+                    'feat_max': [original_features],
+                    'features_average': [np.average(list_feat)],
+                    'AMI_average': [np.average(list_AMI)],
+                    'features_std': [np.std(list_feat)],
+                    'AMI_std': [np.std(list_AMI)],
+                    'best_AMI': [list_AMI[best_index]],
+                    'best_feat': [list_feat[best_index]],
+                    'time_average': [np.average(list_time)]
+                })
+                if ami_results is None:
+                    ami_results = new_ami_results.copy()
+                else:
+                    ami_results = pd.concat([ami_results, new_ami_results])
+
+        if not os.path.exists(f'results/{nameDataset}'):
+            os.mkdir(f'results/{nameDataset}')
+        ami_results.to_csv(f'results/{nameDataset}/morl_pcn_ami_results_{nameDataset}.csv', index=False)
