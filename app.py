@@ -53,11 +53,12 @@ def reset_tab1():
 
 
 # Tab 2
-def reset_local_info_tab2():
+def reset_local_info_tab2(n_features):
     if ('fixed_features' in st.session_state) and len(st.session_state.fixed_features) > 0:
         dummy_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            # n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            n_features=n_features,
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -84,7 +85,7 @@ def update_global_info_tab2():
 
 def reset_tab2():
     st.session_state.tab2_running = False
-    reset_local_info_tab2()
+    reset_local_info_tab2(n_features)
     if ('fixed_features' in st.session_state) and len(st.session_state.fixed_features) > 0:
         st.session_state.tab2_local_features = copy.deepcopy(st.session_state.fixed_features)
     else:
@@ -135,6 +136,8 @@ with st.sidebar:
     )
 
     episodes_for_training = st.slider('Number of episodes to train the RL agent', 1, 100, 30)
+
+    n_features = st.slider('Maximum number of features', 1, len(st.session_state.df_all_feats.columns), math.ceil(len(st.session_state.df_all_feats.columns) * 0.75))
 
     with st.expander('RL Hyperparameters', expanded=False):
         parameters = {}
@@ -215,7 +218,8 @@ with tab1:
         st.session_state.tab1_running = True
         st.session_state.tab1_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            # n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            n_features=n_features,
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -495,7 +499,8 @@ with tab2:
         if ('fixed_features' in st.session_state) and len(st.session_state.fixed_features) > 0:
             dummy_env = FeatureSelectionEnv(
                 df_features=st.session_state.df_all_feats,
-                n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+                # n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+                n_features=n_features,
                 clustering_model=st.session_state.model,
                 normalized_scorers=normalized_scorers,
                 early_stopping=PlateauEarlyStopping(
@@ -520,7 +525,8 @@ with tab2:
         st.session_state.tab2_running = True
         st.session_state.tab2_env = FeatureSelectionEnv(
             df_features=st.session_state.df_all_feats,
-            n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            # n_features=math.ceil(len(st.session_state.df_all_feats.columns) * 0.75),
+            n_features=n_features,
             clustering_model=st.session_state.model,
             normalized_scorers=normalized_scorers,
             early_stopping=PlateauEarlyStopping(
@@ -538,7 +544,7 @@ with tab2:
     def new_episode_tab2():
         st.session_state.tab2_obs = st.session_state.tab2_env.reset()
         update_global_info_tab2()
-        reset_local_info_tab2()
+        reset_local_info_tab2(n_features)
         st.session_state.tab2_episode += 1
         st.session_state.tab2_step  = 0
         st.session_state.tab2_done = False
